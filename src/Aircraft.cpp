@@ -11,14 +11,20 @@
 #include <cmath> // For basic mathematical operations
 
 // Constructor to initialize the Aircraft object with given parameters
-Aircraft::Aircraft(int id, int posX, int posY, int posZ, int velX, int velY, int velZ, int time)
-: aircraftID(id), arrivalTime(time), outsideAirspaceStatus(true) {
-    positionTrue[0] = posX;
-    positionTrue[1] = posY;
-    positionTrue[2] = posZ;
-    velocity[0] = velX;
-    velocity[1] = velY;
-    velocity[2] = velZ;
+Aircraft::Aircraft(){
+
+}
+
+Aircraft::Aircraft(int aircraftId, int posX, int posY, int posZ, int velX, int velY, int velZ, int arrivalTime): arrivalTime(arrivalTime){
+	this->aircraftId = aircraftId;
+
+	this->posX = posX;
+	this->posY = posY;
+	this->posZ = posZ;
+
+	this->velX = velX;
+	this->velY = velY;
+	this->velZ = velZ;
 }
 
 // Destructor
@@ -26,36 +32,77 @@ Aircraft::~Aircraft() {
     // Any cleanup if necessary
 }
 
+int Aircraft::getAircraftId() const {
+	return aircraftId;
+}
+
+void Aircraft::setAircraftId(int aircraftId) {
+	this->aircraftId = aircraftId;
+}
+
+int Aircraft::getArrivalTime() const {
+	return arrivalTime;
+}
+
+void Aircraft::setArrivalTime(int arrivalTime) {
+	this->arrivalTime = arrivalTime;
+}
+
+int Aircraft::getPosX() const {
+	return posX;
+}
+
+void Aircraft::setPosX(int posX) {
+	this->posX = posX;
+}
+
+int Aircraft::getPosY() const {
+	return posY;
+}
+
+void Aircraft::setPosY(int posY) {
+	this->posY = posY;
+}
+
+int Aircraft::getPosZ() const {
+	return posZ;
+}
+
+void Aircraft::setPosZ(int posZ) {
+	this->posZ = posZ;
+}
+
+int Aircraft::getVelX() const {
+	return velX;
+}
+
+void Aircraft::setVelX(int velX) {
+	this->velX = velX;
+}
+
+int Aircraft::getVelY() const {
+	return velY;
+}
+
+void Aircraft::setVelY(int velY) {
+	this->velY = velY;
+}
+
+int Aircraft::getVelZ() const {
+	return velZ;
+}
+
+void Aircraft::setVelZ(int velZ) {
+	this->velZ = velZ;
+}
+
+
 // Updates the position of the aircraft based on its velocity and the elapsed time
 void Aircraft::updatePosition() {
     // Implementation here
 }
 
-// Checks if the aircraft is outside the designated airspace
-bool Aircraft::outsideAirspace() const {
-    // Implementation here
-}
 
-// Retrieves the aircraft's ID
-int Aircraft::getAircraftID() const {
-    // Implementation here
-}
 
-// Retrieves the aircraft's arrival time
-int Aircraft::getArrivalTime() const {
-    // Implementation here
-}
-
-// Retrieves the aircraft's position on the requested axis (0 for X, 1 for Y, 2 for Z)
-int Aircraft::getPosition(int axis) const {
-    // Implementation here
-}
-
-// Retrieves the aircraft's velocity on the requested axis (0 for X, 1 for Y, 2 for Z)
-int Aircraft::getVelocity(int axis) const {
-    // Implementation here
-}
-
-// Additional functionalities as required by the project
 
 
