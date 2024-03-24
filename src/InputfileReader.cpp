@@ -23,7 +23,7 @@ public:
 
     void print_aircraft_data() {
         for (const auto& aircraft : aircraft_list) {
-            aircraft.PrintAircraft();
+            // aircraft.PrintAircraft();
         }
     }
 
@@ -42,7 +42,7 @@ public:
             std::istringstream iss(line);
             int ID, arrivalTime, x, y, z, speed_x, speed_y, speed_z;
             if (iss >> ID >> arrivalTime >> x >> y >> z >> speed_x >> speed_y >> speed_z) {
-                Aircraft aircraft(ID, arrivalTime, {x, y, z}, {speed_x, speed_y, speed_z});
+                Aircraft aircraft(ID,x,y,z,speed_x, speed_y, speed_z, arrivalTime);
                 aircraft_list.push_back(aircraft);
             }
         }
