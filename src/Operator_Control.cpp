@@ -1,62 +1,68 @@
 #include "Operator_Console.h"
 #include <iostream>
 #include <fstream>
+#include <unistd.h>
+
 using namespace std;
 
-OperatorConsole::OperatorConsole() {}
+// Constructor
+Operator_Control::Operator_Control() : compSystem(nullptr) {}
 
-void OperatorConsole::storeCommands(const vector<string>& newCommands) {
-    // Assuming commands are received externally and added to the existing list
-    commands.insert(commands.end(), newCommands.begin(), newCommands.end());
+// Thread function for operator console
+void* Operator_Control::operatorMain(void* arg) {
+    while (true) {
+        // Check for new commands every iteration
+        usleep(500000); // Wait for 0.5 seconds (adjust as needed)
 
-    // Store commands in a log file
-    ofstream logFile("log.txt");
-    if (logFile.is_open()) {
-        for (const auto& command : commands) {
-            logFile << command << endl;
-        }
-        logFile.close();
-    } else {
-        cerr << "Unable to open log file." << endl;
-    }
-}
-
-void OperatorConsole::fetchPlaneData(Aircraft& plane) {
-    // Assuming plane data is fetched from an external source
-    // and stored in the provided Plane object
-}
-
-void OperatorConsole::sendMessage(CompSystem& compSystem) {
-    // Assuming the operator console sends commands to the computer system
-    compSystem.receiveCommands(commands);
-}
-
-void OperatorConsole::printDetails(int id) {
-    // Assuming the operator console displays details of a specific aircraft
-    cout << "Details of aircraft with ID " << id << ":" << std::endl;
-    // Print details here
-}
-
-void* OperatorConsole::operatorMain(void* arg) {
-    // Main function of the Operator Console thread
-    OperatorConsole* opConsole = static_cast<OperatorConsole*>(arg);
-
-    // Assuming some kind of loop or event handling mechanism
-    // to process commands and interact with the computer system
-    for (const auto& command : opConsole->commands) {
-        // Process each command
-        // For example:
-        if (command == "changeSpeed") {
-            // Handle speed change command
-        } else if (command == "changeAltitude") {
-            // Handle altitude change command
-        } else if (command == "changePosition") {
-            // Handle position change command
-        } else {
-            std::cerr << "Invalid command: " << command << std::endl;
+        // Process commands if there are any
+        if (!commands.empty()) {
+            sendCommands(); // Send stored commands to the Computer System
+            commands.clear(); // Clear the commands after sending
         }
     }
-
-    // Assuming some cleanup or termination process
     return nullptr;
+}
+
+// Store a command in the log
+void Operator_Control::storeCommand(const string& command) {
+    commands.push_back(command); // Add command to the list
+    // Optionally, log the command to a file for record-keeping
+    ofstream logfile("commands.log", ios::app);
+    if (logfile.is_open()) {
+        logfile << command << endl;
+        logfile.close();
+    } else {
+        cerr << "Error: Unable to open log file for writing." << endl;
+    }
+}
+
+// Fetch information of a specific plane
+Aircraft Operator_Control::fetchPlaneData(int planeID) {
+    // Access plane information from the appropriate data source
+    // For simplicity, let's assume it's retrieved from a database or stored locally
+	Aircraft Aircraft; // Assuming PlaneData is a struct or class containing aircraft details
+    // Populate planeData with relevant information
+    return Aircraft;
+}
+
+// Send commands to the Computer System
+void Operator_Control::sendCommands() {
+    if (compSystem) {
+        // Send commands to the Computer System for execution
+        for (const string& command : commands) {
+            compSystem->executeCommand(command);
+        }
+    } else {
+        cerr << "Error: Computer System is not available." << endl;
+    }
+}
+
+// Display details of a specific aircraft
+void Operator_Control::displayAircraftDetails(int aircraftID) {
+    // Call appropriate method in CompSystem to display aircraft details
+    if (compSystem) {
+        compSystem->displayAircraftDetails(aircraftID);
+    } else {
+        cerr << "Error: Computer System is not available." << endl;
+    }
 }
