@@ -1,42 +1,31 @@
 #include "Communication_System.h"
-#include "Computer_System.h"
-#include "DataDisplay.h"
+
 #include "Aircraft.h"
 #include <unistd.h>
 #include <iostream>
 #include <string>
 #include <sys/iofunc.h>
 #include <sys/dispatch.h>
-#include <sys/neutrino.h>
-#include "Structure.h"
 #include <pthread.h>
+#include <vector>
+#include "Computer_System.h"
+
 
 using namespace std;
 
-pthread_t createComputerSysThread(void* collisionCallback) {
+typedef struct _pulse msg_header_t;
 
-    int receivedComm;
-	pthread_t thread;
-	pthread_attr_t attr;
+void * communicationMain() {
+	cout << "The communication has begun..." << endl;
 
-	receivedComm = pthread_attr_init(&attr);
+	string nameChannel = "CommunicationChannel";
 
-	receivedComm = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+	cout << "Creating messaging system with" << nameChannel << endl;
 
-	receivedComm = pthread_create(&thread, &attr, Computer_System_Main, NULL, void* collisionCallback);
+	name_attach_t *pathChannel;
 
-	return thread;
-}
+	string message;
 
-
-void * Computer_System_Main(void *arg) {
-
-    cout << "the thread for the computer system is started..." << endl;
-
-	string nameChannel= "ComputerChannel";
-
-    name_attach_t *pathChannel;
-	Msg2ComputerSys message;
 	int receivedID;
 
 	pathChannel = name_attach(NULL, nameChannel.c_str(), 0);
@@ -46,79 +35,52 @@ void * Computer_System_Main(void *arg) {
 		return NULL;
 	}
 
-    time_t timerClock;
-    time(&timerClock);
-
-	while (true) {
+	while(true) {
 		receivedID = MsgReceive(pathChannel->chid, &message, sizeof(message), NULL);
-
-        cout << "Message received!" << endl;
-
-		bool messageFormat = properMsgFormat(receivedID, message);
-
-        if (messageFormat != true){
-            continue;
-        }
-
-        switch(message.type){
-            case AirplaneRadarUpdate:
-                cout << "message from airplane received" << endl;
-                radarUpdate();
-                break;
-
-            case ClockTimerUpdate:
-                collisionCheck();
-                break;
-            case addAirplane:
-                addingAirplane();
-                break;
-            case removeAirplane:
-                removingAirplane();
-                break;
-
-            default:
-                cout << "An unknown message has been received..." << endl;
-                break;
-        }
-
-
-	name_detach(pathChannel, 0);
-
+		cout << "Message received!" << endl;
+	}
 	return NULL;
 }
 
-void addingAirplane(){
-
-}
-
-void removingAirplane(){
-
-}
-
-void radarUpdate(){
-
-}
-
-vector airplanes_checking_collision;
-
-void collisionCheck(){
-
-    cout << "There is a request to update the clock timer.." << endl;
-
-	double collisionTime;
-
-    for (int i = 0; i < airplanes_checking_collision.size(); ++i) {
-
-        for (int j = i + 1; j < airplanes_checking_collision.size(); ++j) {
-
-            if (airplanes_checking_collision[i].IsCollidingWith(airplanes_checking_collision[j])) {
-
-                cout << "there is a collision..." << endl;
-                cout << "We are going to be displaying th plane ID1 and ID2, time of collision, position in the 3d matrix, and collision time" << endl;
-
-                string collisionWarning = "Airplane with ID " << airplanes_checking_collision[i].id << " colliding with airplane with ID " << airplanes_checking_collision[j].id << endl;
-                collisionCallback(collisionWarning);
-            }
-        }
+void disconnectFromChannel(int coid) {
+    int status = ConnectDetach(coid);
+    if (status == -1) {
+        cout<< "Error detaching connection" << endl;
     }
+}
+
+
+pthread_t createCommunication() {
+	int receivedComm;
+	pthread_t thread;
+	pthread_attr_t attribute;
+
+	receivedComm = pthread_attr_init(&attribute);
+
+	receivedComm = pthread_attr_setdetachstate(&attribute, PTHREAD_CREATE_JOINABLE);
+
+	return thread;
+
+}
+
+void sendMessage(int chid, const void *msg, int size) {
+    int receivedID;
+    struct _msg_info info;
+
+    int status = MsgSend(chid, msg, size, NULL, 0);
+
+    if (status == -1) {
+        std::cout << "Error sending message" << endl;
+        return;
+    }
+
+    receivedID = MsgReceive(chid, NULL, 0, &info);
+
+    if (receivedID == -1) {
+        std::cout << "Error receiving reply" << endl;
+        return;
+    }
+}
+
+void Communication_System::sendMessage(){
 }

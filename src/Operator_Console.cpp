@@ -1,23 +1,13 @@
 #include "Operator_Console.h"
-#include "Aircraft.h"
-#include "Communication_System.h"
-#include "Computer_System.h"
-#include <iostream>
-#include <fstream>
-#include <string>
-#include <pthread.h>
-#include <unistd.h>
-#include <vector>
-#include <cmath>
 
 using namespace std;
 
-//Operator_Console::Operator_Console() {
-//	// initialize to not receiving anything from the Communication system
-//	receivedComm(false);
-//	// initialize a pointer to the Computer System to send it data
-//	this->compSystem = nullptr;
-//}
+Operator_Console::Operator_Console() {
+	// initialize to not receiving anything from the Communication system
+	// receivedComm(false);
+	// initialize a pointer to the Computer System to send it data
+	this->compSystem = nullptr;
+}
 
 void Operator_Console::storeCommands() {
 	string filename = "log.txt";
@@ -53,13 +43,13 @@ void* Operator_Console::operatorMain(void* arg) {
 	while(planeID.outsideAirSpace()) {
 
 		if("changeSpeed") {
-			command.changeSpeed(planeID.getAircraftId(), 0.00);
+			command.changeSpeed(planeID, 0.00);
 		}
 		else if("changeAltitude") {
-			command.changeAltitude(planeID.getAircraftId(), 15);
+			command.changeAltitude(planeID, 15);
 		}
 		else if("changePosition") {
-			command.changePosition(planeID.getAircraftId(), 5);
+			command.changePosition(planeID, 5);
 		}
 		else {
 			cout << "This is an invalid command" << endl;

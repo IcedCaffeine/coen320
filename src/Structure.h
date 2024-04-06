@@ -10,13 +10,17 @@ typedef struct _pulse msg_header_t;
 
 typedef enum {
 	OperatorSetAirplaneSpeed,
-	OperatorRequestAirplaneData
+	OperatorRequestAirplaneData,
+	AirplaneRadarUpdate,
+	ClockTimerUpdate,
+	AddAirplane,
+	RemoveAirplane
 } MsgToCommSysType;
 
 typedef enum {
 	CommSysSetAirplaneSpeed,
 	CommSysRequestAirplaneData,
-	ClockTimerUpdate,
+	ClockTimeUpdate,
 	AirplaneScan
 } AirplaneMsgType;
 
@@ -26,7 +30,7 @@ typedef struct  {
 	int id;
 	float posX, posY, posZ;
 	float velX, velY, velZ;
-} MsgToCommSys;
+} MsgToComputerSys;
 
 typedef struct  {
 	msg_header_t hdr;
