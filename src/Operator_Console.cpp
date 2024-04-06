@@ -1,7 +1,5 @@
 #include "Operator_Console.h"
 #include "Aircraft.h"
-#include "Communication_System.h"
-#include "Computer_System.h"
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -9,6 +7,9 @@
 #include <unistd.h>
 #include <vector>
 #include <cmath>
+
+#include "Communication_System.h"
+#include "Computer_System.h"
 
 using namespace std;
 

@@ -26,7 +26,7 @@ typedef struct  {
 	int id;
 	float posX, posY, posZ;
 	float velX, velY, velZ;
-} MsgToCommSys;
+} MsgToComputerSys;
 
 typedef struct  {
 	msg_header_t hdr;

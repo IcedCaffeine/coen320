@@ -4,7 +4,7 @@
 #include <string>
 //#include "Structure.h"
 #include "Aircraft.h"
-#include "Computer_System.h"
+#include "Communication_System.h"
 
 class Operator_Console {
 	private:

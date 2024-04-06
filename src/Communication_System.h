@@ -1,19 +1,28 @@
 #ifndef COMMUNICATION_SYSTEM_H
 #define COMMUNICATION_SYSTEM_H
 
-#include "DataDisplay.h"
 #include <pthread.h>
-
+#include <vector>
+#include "Aircraft.h"
+#include "Computer_System.h"
 
 class Communication_System{
 public:
-	int calculationInterval;
+	Communication_System();
+	pthread_t createCommunication();
 
-	// Computer system thread
-	pthread_t Computer_System_Thread();
+private:
+	void * communicationMain();
 
-	// Thread body
-	void * Computer_System_Main(void * arg);
+	void sendMessage();
+
+	void disconnectFromChannel(int coid);
+
+	Communication_System AircraftVector(std::vector<Aircraft> p);
+
+
+
+
 };
 
 
