@@ -119,7 +119,7 @@ void* radarThreadServer(void * args){
 }
 
 // Main Function in Radar Function
-int RadarMain(int argc, char*argv[]){
+int main(int argc, char*argv[]){
 		//Declare thread
 		pthread_t serverThread;
 		int err_no;
