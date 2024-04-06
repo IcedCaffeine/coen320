@@ -1,36 +1,34 @@
-#pragma once
+#ifndef OPERATOR_CONSOLE_H
+#define OPERATOR_CONSOLE_H
 
 #include <string>
-#include <vector>
+//#include "Structure.h"
 #include "Aircraft.h"
-//#include "CompSystem.h"
+#include "Computer_System.h"
 
-using namespace std;
+class Operator_Console {
+	private:
+		char message;
+		Computer_System* compSystem;
 
-class Operator_Control {
-private:
-    // Store commands sent to the operator console
-    vector<string> commands;
+	public:
+		// Constructor
+		Operator_Console();
 
-    // Pointer to the Computer System
-    ATC* compSystem;
+		// Thread
+		void* operatorMain(void* arg);
 
-public:
-    // Constructor
-    Operator_Control();
+		// Store the commands in a vector
+		void storeCommands();
 
-    // Thread function for operator console
-    void* operatorMain(void* arg);
+		// Get the information of the plane that is requesting for commands
+		void fetchPlaneData(Aircraft* plane);
 
-    // Store a command in the log
-    void storeCommand(const string& command);
+		// Function to send messages to the Computer System
+		void sendMessage(Computer_System* compSystem);
 
-    // Fetch information of a specific plane
-    Aircraft fetchPlaneData(int planeID);
-
-    // Send commands to the Computer System
-    void sendCommands();
-
-    // Display details of a specific aircraft
-    void displayAircraftDetails(int aircraftID);
+		// Function to display the information of the specific aircraft
+		void printDetails(int id);
 };
+
+#endif
