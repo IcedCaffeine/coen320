@@ -1,10 +1,19 @@
 #ifndef OPERATOR_CONSOLE_H
 #define OPERATOR_CONSOLE_H
 
+#include <iostream>
+#include <fstream>
 #include <string>
-//#include "Structure.h"
+#include <pthread.h>
+#include <unistd.h>
+#include <vector>
+#include <cmath>
+
+
+#include "Structure.h"
 #include "Aircraft.h"
 #include "Communication_System.h"
+#include "Computer_System.h"
 
 class Operator_Console {
 	private:

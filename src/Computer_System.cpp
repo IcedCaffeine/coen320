@@ -1,20 +1,5 @@
 #include "Computer_System.h"
 
-#include "DataDisplay.h"
-#include "Aircraft.h"
-#include <unistd.h>
-#include <iostream>
-#include <string>
-#include <sys/iofunc.h>
-#include <sys/dispatch.h>
-#include <sys/neutrino.h>
-#include "Structure.h"
-#include <pthread.h>
-
-#include "Communication_System.h"
-
-using namespace std;
-
 pthread_t createComputerSysThread(void* collisionCallback) {
 
     int receivedComm;
@@ -25,7 +10,7 @@ pthread_t createComputerSysThread(void* collisionCallback) {
 
 	receivedComm = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 
-	receivedComm = pthread_create(&thread, &attr, Computer_System_Main, NULL, void* collisionCallback);
+	receivedComm = pthread_create(&thread, &attr, Computer_System_Main, collisionCallback);
 
 	return thread;
 }
@@ -33,9 +18,9 @@ pthread_t createComputerSysThread(void* collisionCallback) {
 
 void * Computer_System_Main(void *arg) {
 
-    cout << "the thread for the computer system is started..." << endl;
+    std::cout << "the thread for the computer system is started..." << std::endl;
 
-	string nameChannel= "ComputerChannel";
+    std::string nameChannel= "ComputerChannel";
 
     name_attach_t *pathChannel;
 	MsgToComputerSys message;
@@ -44,7 +29,7 @@ void * Computer_System_Main(void *arg) {
 	pathChannel = name_attach(NULL, nameChannel.c_str(), 0);
 
 	if(pathChannel == NULL) {
-		cout << "Error in the channel name" << endl;
+		std::cout << "Error in the channel name" << std::endl;
 		return NULL;
 	}
 
@@ -53,41 +38,60 @@ void * Computer_System_Main(void *arg) {
 
 	while (true) {
 		receivedID = MsgReceive(pathChannel->chid, &message, sizeof(message), NULL);
+		std::cout << "Message received!" << std::endl;
 
-        cout << "Message received!" << endl;
-
+		/*
 		bool messageFormat = properMsgFormat(receivedID, message);
 
         if (messageFormat != true){
             continue;
         }
 
+		*/
         switch(message.type){
             case AirplaneRadarUpdate:
-                cout << "message from airplane received" << endl;
-                radarUpdate();
+            	std::cout << "message from airplane received" << std::endl;
+            	radarUpdate();
                 break;
 
             case ClockTimerUpdate:
                 collisionCheck();
                 break;
-            case addAirplane:
-                addingAirplane();
+            case AddAirplane:
+            	addingAirplane();
                 break;
-            case removeAirplane:
-                removingAirplane();
+            case RemoveAirplane:
+            	removingAirplane();
                 break;
 
             default:
-                cout << "An unknown message has been received..." << endl;
+            	std::cout << "An unknown message has been received..." << std::endl;
                 break;
         }
-
+	}
 
 	name_detach(pathChannel, 0);
-
 	return NULL;
 }
+
+void Computer_System::changeSpeed(Aircraft aircraft, double s) {
+	aircraft.setVelX(static_cast<int>(s));
+	aircraft.setVelY(static_cast<int>(s));
+	aircraft.setVelZ(static_cast<int>(s));
+}
+
+//definition of function to change flight level of aircraft
+void Computer_System::changeAltitude(Aircraft aircraft, int a) {
+	aircraft.setPosZ(a);
+}
+
+//definition of function to change position of aircraft
+void Computer_System::changePosition(Aircraft aircraft, float orient) {
+	aircraft.setPosX(static_cast<int>(orient));
+	aircraft.setPosY(static_cast<int>(orient));
+	aircraft.setPosZ(static_cast<int>(orient));
+}
+
 
 void addingAirplane(){
 
@@ -101,73 +105,36 @@ void radarUpdate(){
 
 }
 
-vector airplanes_checking_collision;
+void collisionCallback(std::string message){
+	std::cout << message << std::endl;
+}
+
+
+typedef std::vector<Aircraft> checkAirPlaneCollision;
 
 void collisionCheck(){
 
-    cout << "There is a request to update the clock timer.." << endl;
+	// Notify About Request
+    std::cout << "There is a request to update the clock timer.." << std::endl;
 
-	double collisionTime;
+    // Initialize
+	checkAirPlaneCollision collidingAirplane;
 
-    for (int i = 0; i < airplanes_checking_collision.size(); ++i) {
+    for(unsigned int i=0;i<collidingAirplane.size();i++){
+    	for(unsigned int j=i+1;i<collidingAirplane.size();i++){
+    		if(collidingAirplane[i].IsCollidingWith(collidingAirplane[j])){
+    			std::cout << "there is a collision..." << std::endl;
+    			std::cout << "We are going to be displaying th plane ID1 and ID2, time of collision, position in the 3d matrix, and collision time" << std::endl;
 
-        for (int j = i + 1; j < airplanes_checking_collision.size(); ++j) {
+				//callback that will send to the Data Display an alert that with the aircraft information that needs to be displayed in case of a collision
+    			std::string collisionWarning = "Airplane with ID ";
+    			collisionWarning +=  std::to_string(collidingAirplane[i].getAircraftId());
+    			collisionWarning += " colliding with airplane with ID ";
+    			collisionWarning += std::to_string(collidingAirplane[j].getAircraftId());
+    			collisionWarning += "\n";
 
-            if (airplanes_checking_collision[i].IsCollidingWith(airplanes_checking_collision[j])) {
-
-                cout << "there is a collision..." << endl;
-                cout << "We are going to be displaying th plane ID1 and ID2, time of collision, position in the 3d matrix, and collision time" << endl;
-
-                string collisionWarning = "Airplane with ID " << airplanes_checking_collision[i].id << " colliding with airplane with ID " << airplanes_checking_collision[j].id << endl;
-                collisionCallback(collisionWarning);
-            }
-        }
+    			collisionCallback(collisionWarning);
+    		}
+		}
     }
 }
-
-void Computer_System::changeSpeed(int id, double s) {
-	Aircraft* plane = nullptr;
-
-	for(int i = 0; i < plane.size(); i++) {
-		if(plane[i].getAircraftId() == id) {
-			plane = &plane[i];
-		}
-	}
-
-	if(plane = nullptr) {
-		cout << "This aircraft is not found" << endl;
-	}
-
-	plane -> setVelX(s);
-}
-
-void Computer_System::changeAltitude(int id, int a) {
-	Aircraft* plane = nullptr;
-	for(int i = 0; i < plane.size(); i++) {
-		if(plane[i].getAircraftId() == id) {
-			plane = &plane[i];
-		}
-	}
-
-	if(plane == nullptr) {
-		cout << "This aircraft is not found" << endl;
-	}
-
-	plane -> setPosZ(a);
-}
-
-void Computer_System::changePosition(int id, float x) {
-	Aircraft* plane = nullptr;
-	for(int i = 0; i < plane.size(); i++) {
-		if(plane[i].getAircraftId() == id) {
-			plane = &plane[i];
-		}
-	}
-
-	if(plane == nullptr) {
-		cout << "This aircraft is not found" << endl;
-	}
-
-	plane -> setPosX(x);
-}
-

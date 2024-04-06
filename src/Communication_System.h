@@ -20,9 +20,6 @@ private:
 
 	Communication_System AircraftVector(std::vector<Aircraft> p);
 
-
-
-
 };
 
 
