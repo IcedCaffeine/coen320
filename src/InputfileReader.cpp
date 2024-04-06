@@ -1,11 +1,3 @@
-/*
- * InputfileReader.cpp
- *
- *  Created on: Mar 23, 2024
- *      Author: Fahad Abdul Rahman
- *      #40157997
- */
-
 #include <fstream>
 #include <sstream>
 #include <iostream>
