@@ -96,7 +96,6 @@ void Aircraft::setVelZ(int velZ) {
 	this->velZ = velZ;
 }
 
-
 // Updates the position of the aircraft based on its velocity and the elapsed time
 void Aircraft::updatePosition() {
     // Implementation here

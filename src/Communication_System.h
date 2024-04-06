@@ -1,25 +1,20 @@
 #ifndef COMMUNICATION_SYSTEM_H
 #define COMMUNICATION_SYSTEM_H
 
+#include "DataDisplay.h"
 #include <pthread.h>
-#include <iostream>
-#include <string>
-#include <sys/dispatch.h>
 
-class CommunicationSystem {
+
+class Communication_System{
 public:
-    CommunicationSystem();
-    ~CommunicationSystem();
+	int calculationInterval;
 
-    void start();
-    void sendMessage(const void *msg, int size);
-    void disconnectFromChannel();
+	// Computer system thread
+	pthread_t Computer_System_Thread();
 
-private:
-    pthread_t communicationThread;
-    name_attach_t *channel;
-    static void* communicationMain(void*);
+	// Thread body
+	void * Computer_System_Main(void * arg);
 };
 
-#endif // COMMUNICATION_SYSTEM_H
 
+#endif
