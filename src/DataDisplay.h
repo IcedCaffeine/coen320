@@ -1,64 +1,54 @@
-#ifndef DATADISPLAY_H
-#define DATADISPLAY_H
+#ifndef DATADISPLAY_H_
+#define DATADISPLAY_H_
 
-/* Include Libraries */
-#include <vector>
-#include <string>
-#include <sstream>
+#include <errno.h>
+#include <fcntl.h>
 #include <fstream>
 #include <iostream>
-
 #include <pthread.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <fcntl.h>
-#include <sys/neutrino.h>
+#include <string.h>
+#include <sys/mman.h>
+#include <time.h>
 
-/* Class Object */
-#include "Aircraft.h"
+#include "Limits.h"
+#include "Timer.h"
 
-/* Defintions */
-#define ROW 50
-#define COLUMN 50
-#define CELLSIZE 25
-
-#define WARNING 1
-#define PLANE 2
-#define LOG 3
-#define GRID 4
-
+// Global Variables
+const int blockCount = (int)MARGIN / (int)SCALER + 1;
 
 class DataDisplay {
-	// Structures
-	typedef struct Plane{
-		std::vector<Aircraft> planes;
-		Aircraft onePlane;
-		int command;
-	}planeMessage;
-
 private:
-	// Data
-	int channelId, fileId;
+	// execution time members
+	time_t startTime;
+	time_t finishTime;
 
-	// Roles
-	std::string makeGrid(std::vector <Aircraft> aircrafts);
+	// threads
+	pthread_t dataDisplayThread;
+	pthread_attr_t attr;
+	pthread_mutex_t mutex; // mutex for display
+
+	// Temporary values
+	std::string grid[blockCount][blockCount] = {{""}}; // Shrink 100k by 100k map to 10 by 10, each block is 10k by 10k
+	std::string displayedHeight = "";
+
+	// shm members
+	int shm_display; // Display required info
+	void *ptr_display;
 
 public:
-	// Constructor
+	// Constructor & Destructor
 	DataDisplay();
-	virtual ~DataDisplay();
-
-	// Set & Get
-	int getChannelId() const;
-	void setChannelId(int channelId);
-	int getFileId() const;
-	void setFileId(int fileId);
+	~DataDisplay();
 	
-	// Role
-	void run();
-	void getMessage();
-
+	// Roles
+	int initialize();
+	void start();
+	int stop();
+	static void *startDisplay(void *context);
+	void *updateDisplay(void);
+	void displayMap();
 
 };
 
-#endif /* SRC_DATADISPLAY_H_ */
+#endif /* DATADISPLAY_H_ */

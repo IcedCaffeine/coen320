@@ -1,69 +1,43 @@
-#ifndef TIMER_H
-#define TIMER_H
+#ifndef TIMER_H_
+#define TIMER_H_
 
-// Include Libraries
-#include <stdint.h>
-#include <time.h>
-#include <math.h>
 #include <errno.h>
-#include <iostream>
-
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <sys/neutrino.h>
-#include <sys/syspage.h>
+#include <sys/siginfo.h>
+#include <time.h>
+#include <unistd.h>
+
+#include "Limits.h"
+// message structure
+typedef struct {
+  int messageType; // contains both message to and from client
+  int messageData; // optional data, depending upon message
+} ClientMessage;
+
+typedef union {
+  ClientMessage msg;   // a message can be either from a client
+  struct _pulse pulse; // a pulse
+} Message;
 
 class Timer {
 private:
 	// Data
-	int channelId, connectionId;
-	char msgBuffer[100];
-	uint64_t cyclePerSecond, tickCycles, tockCycles;
-	timer_t timerId;
-
-	// Structures
-	struct sigevent event;
-	struct itimerspec timerSpec;
-
-
-public:
-	// Constructor & Destructor
-	Timer(uint32_t timeInSec);
-	Timer(uint32_t sec, uint32_t msec);
-	virtual ~Timer();
+	int connectionId;
+	timer_t timerId;         // timer ID
+	struct sigevent event;   // event to deliver
+	struct itimerspec timer; // timer data structure
 	
-
+public:
+	// Constructor
+	Timer(int channelId);
+	int setTimer(int offset, int period);
+	
 	// Set & Get
-	int getChannelId() const;
-	void setChannelId(int channelId);
-
 	int getConnectionId() const;
 	void setConnectionId(int connectionId);
-
-	uint64_t getCyclePerSecond() const;
-	void setCyclePerSecond(uint64_t cyclePerSecond);
-
-	const struct sigevent& getEvent() const;
-	void setEvent(const struct sigevent &event);
-
-	const char* getMsgBuffer() const;
-
-	uint64_t getTickCycles() const;
-	void setTickCycles(uint64_t tickCycles);
-
-	timer_t getTimerId() const;
-	void setTimerId(timer_t timerId);
-
-	const struct itimerspec& getTimerSpec() const;
-	void setTimerSpec(uint32_t sec, uint32_t msec);
-
-	uint64_t getTockCycles() const;
-	void setTockCycles(uint64_t tockCycles);
-
-	// Roles
-	void waitTimer();
-	void startTimer();
-	void tick();
-	double tock();
-
 };
 
-#endif /* TIMER_H */
+#endif /* TIMER_H_ */

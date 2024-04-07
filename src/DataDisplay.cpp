@@ -1,170 +1,209 @@
 #include "DataDisplay.h"
 
-DataDisplay::DataDisplay() {
-	this->fileId = -1;
-	this->channelId = -1;
+#include <iostream>
 
+DataDisplay::DataDisplay() {
+	initialize(); // Construction Initialization Call
 }
 
 DataDisplay::~DataDisplay() {
-	// TODO Auto-generated destructor stub
+	shm_unlink("display"); // Unlink shared memory on termination
 }
 
-int DataDisplay::getChannelId() const {
-	return channelId;
-}
-
-int DataDisplay::getFileId() const {
-	return fileId;
-}
-
-void DataDisplay::setFileId(int fileId) {
-	this->fileId = fileId;
-}
-
-void DataDisplay::setChannelId(int channelId) {
-	this->channelId = channelId;
-}
-
-void DataDisplay::run(){
-	// Channel For Aircraft
-	this->setChannelId(ChannelCreate(0));
-	if(this->getChannelId() == -1){
-		printf("Failed to create Channel. Exit Thread! \n");
+int DataDisplay::initialize() {
+	/*Make threads in detached state*/
+	int rc = pthread_attr_init(&attr);
+	if (rc) {
+		printf("ERROR, RC from pthread_attr_init() is %d \n", rc);
 	}
 
-	this->setFileId(creat("/data/home/qnxuser/file.dat", S_IRUSR | S_IWUSR | S_IXUSR));
-	if (this->getFileId() == -1)
-	{
-		std::cout << "Log file could not be created" << std::endl;
+	rc = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+	if (rc) {
+		printf("ERROR; RC from pthread_attr_setdetachstate() is %d \n", rc);
 	}
 
-	// Get Message
-	this->getMessage();
+	/*Create shared memory for display*/
+	// open list of waiting planes shm
+	shm_display = shm_open("display", O_RDWR, 0666);
+	if (shm_display == -1) {
+		perror("in shm_open() Display");
+		exit(1);
+	}
 
+	ptr_display = mmap(0, SIZE_SHM_DISPLAY, PROT_READ | PROT_WRITE, MAP_SHARED,
+			shm_display, 0);
+
+	if (ptr_display == MAP_FAILED) {
+
+		perror("in map() Display");
+		exit(1);
+	}
+
+	return 0;
 }
 
-void DataDisplay::getMessage(){
-	// Get Aircrafts
-	planeMessage msg;
-	int receiveId;
+void DataDisplay::start() {
+	time(&startTime);
+	if (pthread_create(&dataDisplayThread, &attr, &DataDisplay::startDisplay,
+			(void *)this) != EOK) {
+		dataDisplayThread = 0;
+	}
+}
 
-	while(true){
-		receiveId = MsgReceive(this->getChannelId(), &msg, sizeof(msg), NULL);
+int DataDisplay::stop() {
+	pthread_join(dataDisplayThread, NULL); // Join thread on stop
 
-		// Write Based on Message
-		switch(msg.command){
-			case WARNING:{
-				// Acknowledge message
-				MsgReply(receiveId, EOK, NULL, 0);
+	return 0;
+}
 
-				// Get Plane Position and Velocity
-				printf("WARNING\n");
-				printf("Aircraft ID : %d\n", (int) msg.onePlane.getAircraftId());
-				printf("Position (X,Y,Z) = %d,%d,%d\n",
-					(int)msg.onePlane.getPosX(),
-					(int)msg.onePlane.getPosY(),
-					(int)msg.onePlane.getPosZ()
-				);
-				printf("Velocity (X,Y,Z) = %d,%d,%d\n",
-					(int)msg.onePlane.getVelX(),
-					(int)msg.onePlane.getVelY(),
-					(int)msg.onePlane.getVelZ()
-				);
-				break;
-			}
-			case PLANE:{
-				// Acknowledge message
-				MsgReply(receiveId, EOK, NULL, 0);
+void *DataDisplay::startDisplay(void *context) {
+	((DataDisplay *)context)->updateDisplay();
+	return NULL;
+}
 
-				// Get Plane Position and Velocity
-				printf("Aircraft ID : %d\n", (int) msg.onePlane.getAircraftId());
-				printf("Position (X,Y,Z) = %d,%d,%d\n",
-						(int)msg.onePlane.getPosX(),
-						(int)msg.onePlane.getPosY(),
-						(int)msg.onePlane.getPosZ()
-				);
-				printf("Velocity (X,Y,Z) = %d,%d,%d\n",
-						(int)msg.onePlane.getPosX(),
-						(int)msg.onePlane.getPosY(),
-						(int)msg.onePlane.getPosZ()
-				);
-				break;
-			}
-			case GRID:{
-				// Acknowledge message
-				MsgReply(receiveId, EOK, NULL, 0);
-				std::cout << this->makeGrid(msg.planes); // Draw Grid
-				break;
-			}
-			case LOG:{
-				// Get String
-				const char* buffer = this->makeGrid(msg.planes).c_str();
-				MsgReply(receiveId, EOK, NULL, 0);
+void *DataDisplay::updateDisplay(void) {
+	// Link to channel
+	int chid = ChannelCreate(0);
+	if (chid == -1) {
+		std::cout << "couldn't create display channel!\n";
+	}
 
-				// Get Size of Grid
-				int writtenSize = write(this->getFileId(), buffer, sizeof(buffer));
-				if(writtenSize != sizeof(buffer)){
-					perror("Error writing to Log File");
+	// Setup period of 5 seconds
+	Timer timer(chid);
+	timer.setTimer(DATA_DISPLAY_PERIOD, DATA_DISPLAY_PERIOD);
+
+	// Receive data
+	int rcvid;
+	Message msg;
+	int logging_counter = 1;
+	std::ofstream out("log");
+
+	while (1) {
+		if (rcvid == 0) {
+			pthread_mutex_lock(&mutex);
+			// Parsing buffers
+			int axis = 0, z = 0; // 0=ID, 1=X, 2=Y, 3=Z, 4=Height display control bit;
+			std::string buffer = "";
+			std::string x = "", y = "", display_bit = "";
+			std::string id = "";
+			// Read from shared memory pointer
+			for (int i = 0; i < SIZE_SHM_DISPLAY; i++) {
+				char readChar = *((char *)ptr_display + i);
+				if (readChar == 't') {
+					std::cout << "display done\n";
+					time(&finishTime);
+					double execTime = difftime(finishTime, startTime);
+					std::cout << "display execution time: " << execTime << " seconds\n";
+					ChannelDestroy(chid);
+					out.close();
+					return 0;
 				}
-				break;
-			}
-
-		}
-	}
-
-}
-
-std::string DataDisplay::makeGrid(std::vector <Aircraft> aircrafts){
-	std::string grid[ROW][COLUMN];
-
-	// Generate 3D Grid
-	for(unsigned int i=0; i<aircrafts.size(); i++){
-		// Rows
-		for(int x=0;x<ROW;x++){
-			bool validPosition =
-					aircrafts[i].getPosX() >= (CELLSIZE *x) &&
-					aircrafts[i].getPosY() >= (CELLSIZE *(x+1));
-
-			if(validPosition){
-				// Columns
-				for(int y=0;y<COLUMN;y++){
-					validPosition =
-							aircrafts[i].getPosX() >= (CELLSIZE *y) &&
-							aircrafts[i].getPosY() >= (CELLSIZE *(y+1));
-					if(validPosition){
-						if(grid[x][y] != ""){
-							grid[x][y] += " & ";
+				// Check for ending character
+				if (readChar == ';') {
+					break;
+				} else if (readChar == ',' || readChar == '/') {
+					// Check for 2 delimiters
+					// Load buffer according to placement of value
+					if (buffer.length() > 0) {
+						switch (axis) {
+						case 0:
+							id = buffer;
+							break;
+						case 1:
+							x = buffer;
+							break;
+						case 2:
+							y = buffer;
+							break;
+						case 3:
+							z = stoi(buffer);
+							z += ALTITUDE;
+							break;
+						case 4:
+							display_bit = buffer;
+							break;
 						}
-						grid[x][y] += std::to_string(aircrafts[i].getAircraftId());
 					}
+					if (readChar == ',') {
+						axis++;
+						buffer = "";
+					} else if (readChar == '/') {
+						// One plane has finished loading, parsing and reset control values
+						if (grid[(100000 - stoi(y)) / SCALER][stoi(x) / SCALER] == "") {
+							grid[(100000 - stoi(y)) / SCALER][stoi(x) / SCALER] += id;
+						} else {
+							grid[(100000 - stoi(y)) / SCALER][stoi(x) / SCALER] += "\\" + id;
+						}
+						// Height display control
+						if (display_bit == "1") {
+							displayedHeight = displayedHeight + "Plane " + id +
+									" has height of " + std::to_string(z) + " ft\n";
+						}
+						x = "";
+						y = "";
+						z = 0;
+						id = "";
+						display_bit = "";
+						axis = 0;
+						buffer = "";
+					}
+				} else {
+					buffer +=
+							readChar; // Keep loading buffer until delimiter has been detected
 				}
 			}
-		}
-	}
+			pthread_mutex_unlock(&mutex);
 
-	// Print Grid
-	std::stringstream out;
-	for(int i=0;i<ROW;i++){
-		for(int j=0;j<COLUMN;j++){
-			if(grid[i][j] == ""){
-				out << "|        ";
+			// Logging the airspace into a log file
+			// Since every period is 5 seconds, we want to wait 6 periods to do this
+			if (logging_counter == 6) {
+				std::cout << "Logging current airspace..." << std::endl;
+				std::streambuf *coutbuf = std::cout.rdbuf(); // save old buf
+				std::cout.rdbuf(out.rdbuf()); // redirect std::cout to out.txt!
+
+				// this used to print to stdout but now we redirected it to out.txt
+				displayMap(); // Display map and height command
+				std::cout << std::endl;
+
+				std::cout.rdbuf(coutbuf); // reset to standard output again
+				logging_counter = 1;
 			}
-			else{
-				out << "|";
-				out << grid[i][j] << "    ";
+
+			// if not during a multiple of 30 second period, just print to stdout
+			// normally
+			else {
+				displayMap(); // Display map and height command
 			}
-		}
 
-		for(int i=0;i<10*ROW;i++){
-			out << "-";
+			logging_counter++;
+
+			displayedHeight = ""; // Reset buffer
+			// Reset map array
+			memset(grid, 0,
+					sizeof(grid[0][0]) * blockCount *
+					blockCount); // Reset map to 0 for next set
 		}
-		out << "\n";
+		rcvid = MsgReceive(chid, &msg, sizeof(msg), NULL);
 	}
-	out << "\n";
-
-	return out.str();
+	ChannelDestroy(chid);
+	return 0;
 }
 
 
-
+// Printing grid
+void DataDisplay::displayMap() {
+	for (int j = 0; j < blockCount; j++) {
+		for (int k = 0; k < blockCount; k++) {
+			// Print Empty block if no item
+			if (this->grid[j][k] == "") {
+				std::cout << "_|";
+			} else {
+				// print plane ID if there are items
+				std::cout << this->grid[j][k] << "|";
+			}
+		}
+		std::cout << std::endl;
+	}
+	// Display height
+	printf("%s\n", displayedHeight.c_str());
+}
