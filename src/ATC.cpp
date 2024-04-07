@@ -1,9 +1,8 @@
 #include "Communication_System.h"
 
 int main() {
-	Communication_System communicationSystem;
-	pthread_t CommSystemThread = communicationSystem.createCommunication();
-	pthread_join(CommSystemThread, NULL);
+	pthread_t CommunicationSystemThread = createCommunicationThread();
+	pthread_join(CommunicationSystemThread, NULL);
 
 	return 0;
 }

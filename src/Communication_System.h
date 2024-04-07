@@ -6,21 +6,17 @@
 #include "Aircraft.h"
 #include "Computer_System.h"
 
-class Communication_System{
+class Communication_System {
 public:
 	Communication_System();
-	pthread_t createCommunication();
-
-private:
-	void * communicationMain();
-
-	void sendMessage();
-
-	void disconnectFromChannel(int coid);
-
-	Communication_System AircraftVector(std::vector<Aircraft> p);
 
 };
 
+pthread_t createCommunicationThread();
+
+void * communicationMain();
+void sendMessage(std::string fileName);
+void disconnectFromChannel(int coid);
+Communication_System AircraftVector(std::vector<Aircraft> p);
 
 #endif

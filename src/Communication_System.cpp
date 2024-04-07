@@ -50,7 +50,7 @@ void disconnectFromChannel(int coid) {
 }
 
 
-pthread_t createCommunication() {
+pthread_t createCommunicationThread() {
 	int receivedComm;
 	pthread_t thread;
 	pthread_attr_t attribute;
@@ -82,5 +82,6 @@ void sendMessage(int chid, const void *msg, int size) {
     }
 }
 
-void Communication_System::sendMessage(){
+void sendMessage(string fileName){
+	std::vector<Aircraft> planeList = readAircraftFromFile(fileName);
 }
