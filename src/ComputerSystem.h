@@ -48,8 +48,8 @@ private:
 	int currentPeriod;
 	std::vector<plane *> flyingPlanesInfo;
 	std::vector<trajectoryPrediction *> trajectoryPredictions;
-	std::vector<void *> commPtrs;
-	std::vector<std::string> commNames;
+	std::vector<void *> communicationPtr;
+	std::vector<std::string> communicationNames;
 
 	// Timer
 	Timer *timer;
@@ -65,7 +65,7 @@ private:
 
 	// shm members
 	int shm_airspace;
-	void *airspacePtr;
+	void *flyingPlanesPtr;
 	int shm_period;
 	void *periodPtr;
 	int shm_display;
@@ -86,10 +86,10 @@ public:
 	~ComputerSystem();
 	
 	// Set & Get
-	std::vector<std::string> getCommNames() const;
-	void setCommNames(std::vector<std::string> commNames);
-	std::vector<void*> getCommPtrs() const;
-	void setCommPtrs(const std::vector<void*> commPtrs);
+	std::vector<std::string> getCommunicationNames() const;
+	void setCommunicationNames(std::vector<std::string> communicationNames);
+	std::vector<void*> getCommunicationPtrs() const;
+	void setCommunicationPtrs(const std::vector<void*> communicationPtr);
 	int getCurrentPeriod() const;
 	void setCurrentPeriod(int currentPeriod);
 	std::vector<plane*> getFlyingPlanesInfo() const;

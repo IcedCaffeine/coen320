@@ -107,13 +107,12 @@ int ATC::initialize() {
   ftruncate(shm_flyingPlanes, SIZE_SHM_SSR);
 
   // map shm
-  flyingPtr = mmap(0, SIZE_SHM_SSR, PROT_READ | PROT_WRITE, MAP_SHARED,
-                   shm_flyingPlanes, 0);
-  if (flyingPtr == MAP_FAILED) {
+  flyingPlanesPtr = mmap(0, SIZE_SHM_SSR, PROT_READ | PROT_WRITE, MAP_SHARED,shm_flyingPlanes, 0);
+  if (flyingPlanesPtr == MAP_FAILED) {
     printf("map failed flying planes\n");
     return -1;
   }
-  sprintf((char *)flyingPtr, ";");
+  sprintf((char *)flyingPlanesPtr, ";");
 
   // ============ initialize shm for airspace (compsys <-> ssr) ============
   shm_airspace = shm_open("airspace", O_CREAT | O_RDWR, 0666);

@@ -39,7 +39,7 @@ private:
 	  int shm_waitingPlanes;
 	  void *waitingPtr;
 	  int shm_flyingPlanes;
-	  void *flyingPtr;
+	  void *flyingPlanesPtr;
 	  int shm_airspace;
 	  void *airspacePtr;
 	  int shm_period;

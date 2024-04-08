@@ -142,10 +142,11 @@ int SecondaryRadar::initialize(int numberOfPlanes) {
 			}
 
 			waitingPtrs.push_back(ptr);
-
 			fileDataBuffer = "";
 			continue;
-		} else if (readChar == ';') {
+
+		}
+		else if (readChar == ';') {
 			this->getWaitingFileNames().push_back(fileDataBuffer);
 
 			// open shm for current plane

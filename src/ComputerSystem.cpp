@@ -11,7 +11,7 @@ ComputerSystem::ComputerSystem(int planeCount) {
 ComputerSystem::~ComputerSystem() {
 	shm_unlink("airspace");
 	shm_unlink("display");
-	for (std::string name : this->getCommNames()) {
+	for (std::string name : this->getCommunicationNames()) {
 		shm_unlink(name.c_str());
 	}
 	pthread_mutex_destroy(&mutex);
@@ -33,20 +33,20 @@ int ComputerSystem::stop() {
 	return 0;
 }
 
-std::vector<std::string> ComputerSystem::getCommNames() const {
-	return commNames;
+std::vector<std::string> ComputerSystem::getCommunicationNames() const {
+	return communicationNames;
 }
 
-void ComputerSystem::setCommNames(std::vector<std::string> commNames) {
-	this->commNames = commNames;
+void ComputerSystem::setCommunicationNames(std::vector<std::string> commNames) {
+	this->communicationNames = commNames;
 }
 
-std::vector<void*> ComputerSystem::getCommPtrs() const {
-	return commPtrs;
+std::vector<void*> ComputerSystem::getCommunicationPtrs() const {
+	return communicationPtr;
 }
 
-void ComputerSystem::setCommPtrs(std::vector<void*> commPtrs) {
-	this->commPtrs = commPtrs;
+void ComputerSystem::setCommunicationPtrs(std::vector<void*> commPtrs) {
+	this->communicationPtr = commPtrs;
 }
 
 int ComputerSystem::getCurrentPeriod() const {
@@ -108,12 +108,11 @@ int ComputerSystem::initialize() {
 		exit(1);
 	}
 
-	airspacePtr = mmap(0, SIZE_SHM_AIRSPACE, PROT_READ, MAP_SHARED, shm_airspace, 0);
-	if (airspacePtr == MAP_FAILED) {
+	flyingPlanesPtr = mmap(0, SIZE_SHM_AIRSPACE, PROT_READ, MAP_SHARED, shm_airspace, 0);
+	if (flyingPlanesPtr == MAP_FAILED) {
 		perror("in Computer System map() airspace");
 		exit(1);
 	}
-
 
 	shm_period = shm_open("period", O_RDWR, 0666);
 	if (shm_period == -1) {
@@ -121,14 +120,11 @@ int ComputerSystem::initialize() {
 		exit(1);
 	}
 
-
-	periodPtr = mmap(0, SIZE_SHM_PERIOD, PROT_READ | PROT_WRITE, MAP_SHARED,
-			shm_period, 0);
+	periodPtr = mmap(0, SIZE_SHM_PERIOD, PROT_READ | PROT_WRITE, MAP_SHARED,shm_period, 0);
 	if (periodPtr == MAP_FAILED) {
 		perror("in map() PSR: period");
 		exit(1);
 	}
-
 
 	shm_display = shm_open("display", O_RDWR, 0666);
 	if (shm_display == -1) {
@@ -151,8 +147,8 @@ int ComputerSystem::initialize() {
 		exit(1);
 	}
 
-	void *commPtr = mmap(0, SIZE_SHM_PSR, PROT_READ, MAP_SHARED, shm_comm, 0);
-	if (commPtr == MAP_FAILED) {
+	void *communicationPtr = mmap(0, SIZE_SHM_PSR, PROT_READ, MAP_SHARED, shm_comm, 0);
+	if (communicationPtr == MAP_FAILED) {
 		perror("in compsys map() comm");
 		exit(1);
 	}
@@ -161,68 +157,61 @@ int ComputerSystem::initialize() {
 	std::string buffer = "";
 
 	for (int i = 0; i < SIZE_SHM_PSR; i++) {
-		char readChar = *((char *)commPtr + i);
+		char readChar = *((char *)communicationPtr + i);
 
-		if (readChar == ',') {
-
-			// open shm for current plane
+		// Open shm ifor current Plane
+		if(readChar == ','){
 			int shm_plane = shm_open(buffer.c_str(), O_RDWR, 0666);
 			if (shm_plane == -1) {
 				perror("in compsys shm_open() plane");
-
 				exit(1);
 			}
 
-			// map memory for current plane
-			void *ptr = mmap(0, SIZE_SHM_PLANES, PROT_READ | PROT_WRITE, MAP_SHARED,
-					shm_plane, 0);
+			// Map Plane Current Memory
+			void *ptr = mmap(0, SIZE_SHM_PLANES, PROT_READ | PROT_WRITE, MAP_SHARED,shm_plane, 0);
 			if (ptr == MAP_FAILED) {
 				perror("in compsys map() plane");
 				exit(1);
 			}
-			this->getCommPtrs().push_back(ptr);
-			this->getCommNames().push_back(buffer);
+			this->getCommunicationPtrs().push_back(ptr);
+			this->getCommunicationNames().push_back(buffer);
 
+			// Update Buffer
 			buffer = "";
 			continue;
-		} else if (readChar == ';') {
-			// open shm for current plane
+		}
+		else if(readChar == ';'){
 			int shm_plane = shm_open(buffer.c_str(), O_RDWR, 0666);
 			if (shm_plane == -1) {
 				perror("in compsys shm_open() plane");
-
 				exit(1);
 			}
 
-			// map memory for current plane
-			void *ptr = mmap(0, SIZE_SHM_PLANES, PROT_READ | PROT_WRITE, MAP_SHARED,
-					shm_plane, 0);
+			// Map Plane Current Memory
+			void *ptr = mmap(0, SIZE_SHM_PLANES, PROT_READ | PROT_WRITE, MAP_SHARED,shm_plane, 0);
 			if (ptr == MAP_FAILED) {
 				perror("in compsys map() plane");
 				exit(1);
 			}
-			this->getCommPtrs().push_back(ptr);
-			this->getCommNames().push_back(buffer);
-
+			this->getCommunicationPtrs().push_back(ptr);
+			this->getCommunicationNames().push_back(buffer);
 			break;
 		}
-
 		buffer += readChar;
 	}
-
 	return 0;
 }
 
 void *ComputerSystem::calculateTrajectories() {
 	// create channel to communicate with timer
-	int chid = ChannelCreate(0);
-	if (chid == -1) {
+	int channelId = ChannelCreate(0);
+	if (channelId == -1) {
 		std::cout << "couldn't create channel\n";
 	}
 
-	Timer *newTimer = new Timer(chid);
-	timer = newTimer;
-	timer->setTimer(CS_PERIOD, CS_PERIOD);
+	Timer *newTimer = new Timer(channelId);
+	this->timer = newTimer;
+	this->timer->setTimer(CS_PERIOD, CS_PERIOD);
 
 	int receiveId;
 	Message msg;
@@ -230,7 +219,7 @@ void *ComputerSystem::calculateTrajectories() {
 	std::ofstream outputStream("command");
 
 	bool done = false;
-	while (1) {
+	while (true) {
 		if (receiveId == 0) {
 			pthread_mutex_lock(&mutex);
 
@@ -238,7 +227,7 @@ void *ComputerSystem::calculateTrajectories() {
 			this->cleanPredictions();// prune predictions
 			this->computeViolations(&outputStream); // compute airspace violations for all planes in the airspace
 			this->writeAndDisplay(); // send airspace info to display / prune airspace info
-			this->updatePeriod(chid); // update the period based on the traffic
+			this->updatePeriod(channelId); // update the period based on the traffic
 
 			pthread_mutex_unlock(&mutex);
 		}
@@ -250,16 +239,16 @@ void *ComputerSystem::calculateTrajectories() {
 			double execTime = difftime(finishTime, startTime);
 			std::cout << "computer system execution time: " << execTime << " seconds\n";
 			sprintf((char *)displayPtr, "terminated");
-			ChannelDestroy(chid);
+			ChannelDestroy(channelId);
 			return 0;
 		}
 
-		receiveId = MsgReceive(chid, &msg, sizeof(msg), NULL);
+		receiveId = MsgReceive(channelId, &msg, sizeof(msg), NULL);
 	}
 
 	outputStream.close();
 
-	ChannelDestroy(chid);
+	ChannelDestroy(channelId);
 
 	return 0;
 }
@@ -273,7 +262,7 @@ bool ComputerSystem::readAirspace() {
 
 	// find planes in airspace
 	for (int i = 0; i < SIZE_SHM_AIRSPACE; i++) {
-		char readCharacter = *((char *)airspacePtr + i);
+		char readCharacter = *((char *)flyingPlanesPtr + i);
 		if (readCharacter == 't') {
 			return true;
 		}
@@ -289,7 +278,7 @@ bool ComputerSystem::readAirspace() {
 
 			// check if already in airspace, if yes update with current data
 			bool inList = false;
-			for (plane *craft : flyingPlanesInfo) {
+			for (plane *craft : this->getFlyingPlanesInfo()) {
 				if (craft->id == id) {
 					// if found, update with current info
 					craft->posX = pos[0];
@@ -303,7 +292,7 @@ bool ComputerSystem::readAirspace() {
 					// it is already in the list, do not add new
 					inList = true;
 
-					for (trajectoryPrediction *prediction : trajectoryPredictions) {
+					for (trajectoryPrediction *prediction : this->getTrajectoryPredictions()) {
 						if (prediction->id == craft->id) {
 
 							// if end of prediction reached, break
@@ -739,7 +728,7 @@ void ComputerSystem::computeViolations(std::ofstream *out) {
 					bool currComm = false;
 					bool compComm = false;
 					// find comm
-					for (void *comm : this->getCommPtrs()) {
+					for (void *comm : this->getCommunicationPtrs()) {
 						// comm shm id
 						int commId = atoi((char *)comm);
 
