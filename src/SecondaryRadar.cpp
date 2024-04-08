@@ -124,7 +124,7 @@ int SecondaryRadar::initialize(int numberOfPlanes) {
 		char readChar = *((char *)waitingPlanesPtr + i);
 
 		if (readChar == ',') {
-			waitingFileNames.push_back(fileDataBuffer);
+			this->getWaitingFileNames().push_back(fileDataBuffer);
 
 			// open shm for current plane
 			int shm_plane = shm_open(fileDataBuffer.c_str(), O_RDONLY, 0666);
@@ -146,7 +146,7 @@ int SecondaryRadar::initialize(int numberOfPlanes) {
 			fileDataBuffer = "";
 			continue;
 		} else if (readChar == ';') {
-			waitingFileNames.push_back(fileDataBuffer);
+			this->getWaitingFileNames().push_back(fileDataBuffer);
 
 			// open shm for current plane
 			int shm_plane = shm_open(fileDataBuffer.c_str(), O_RDONLY, 0666);

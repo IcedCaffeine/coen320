@@ -109,12 +109,12 @@ int PrimaryRadar::initialize(int numberOfPlanes) {
 		exit(1);
 	}
 
-	std::string FD_buffer = "";
+	std::string fileDataBuffer = "";
 	for (int i = 0; i < SIZE_SHM_PSR; i++) {
 		char readChar = *((char *)waitingPlanesPtr + i);
 		if (readChar == ',') {
-			this->getWaitingFileNames().push_back(FD_buffer);
-			int shm_plane = shm_open(FD_buffer.c_str(), O_RDONLY, 0666);
+			this->getWaitingFileNames().push_back(fileDataBuffer);
+			int shm_plane = shm_open(fileDataBuffer.c_str(), O_RDONLY, 0666);
 			if (shm_plane == -1) {
 				perror("in shm_open() Primary Radar plane");
 				exit(1);
@@ -127,13 +127,13 @@ int PrimaryRadar::initialize(int numberOfPlanes) {
 				exit(1);
 			}
 			planePtrs.push_back(ptr);
-			FD_buffer = "";
+			fileDataBuffer = "";
 			continue;
 		} else if (readChar == ';') {
-			waitingFileNames.push_back(FD_buffer);
+			this->getWaitingFileNames().push_back(fileDataBuffer);
 
 			// open shm for current plane
-			int shm_plane = shm_open(FD_buffer.c_str(), O_RDONLY, 0666);
+			int shm_plane = shm_open(fileDataBuffer.c_str(), O_RDONLY, 0666);
 			if (shm_plane == -1) {
 				perror("in shm_open() PSR plane");
 
@@ -151,7 +151,7 @@ int PrimaryRadar::initialize(int numberOfPlanes) {
 			break;
 		}
 
-		FD_buffer += readChar;
+		fileDataBuffer += readChar;
 	}
 
 	shm_flyingPlanes = shm_open("flying_planes", O_RDWR, 0666);
@@ -213,7 +213,7 @@ void *PrimaryRadar::OperatePrimaryRadar(void) {
 
 			// check for PSR termination
 			if (this->getNumWaitingPlanes() <= 0) {
-				std::cout << "psr done\n";
+				std::cout << "Primary radar is done\n";
 				time(&finishTime);
 				double execTime = difftime(finishTime, startTime);
 				std::cout << "PSR execution time: " << execTime << " seconds\n";
@@ -256,14 +256,16 @@ bool PrimaryRadar::readWaitingPlanes() {
 		time(&et);
 		double t_current = difftime(et, at);
 		if (curr_arrival_time <= t_current) {
-			move = true;
-			this->getFlyingFileNames().push_back(this->getWaitingFileNames().at(i));
-			this->getWaitingFileNames().erase(this->getWaitingFileNames().begin() + i);
+			if(!this->getWaitingFileNames().empty()){
+				move = true;
+				this->getFlyingFileNames().push_back(this->getWaitingFileNames().at(i));
+				this->getWaitingFileNames().erase(this->getWaitingFileNames().begin() + i);
 
-			it = planePtrs.erase(it);
-			this->setNumWaitingPlanes(this->getNumWaitingPlanes() - 1);
-
-		} else {
+				it = planePtrs.erase(it);
+				this->setNumWaitingPlanes(this->getNumWaitingPlanes() - 1);
+			}
+		}
+		else {
 			i++; // only increment if no plane to transfer
 			++it;
 		}

@@ -104,13 +104,13 @@ int ComputerSystem::initialize() {
 	// shared memory members
 	shm_airspace = shm_open("airspace", O_RDONLY, 0666);
 	if (shm_airspace == -1) {
-		perror("in compsys shm_open() airspace");
+		perror("in Computer System shm_open() airspace");
 		exit(1);
 	}
 
 	airspacePtr = mmap(0, SIZE_SHM_AIRSPACE, PROT_READ, MAP_SHARED, shm_airspace, 0);
 	if (airspacePtr == MAP_FAILED) {
-		perror("in compsys map() airspace");
+		perror("in Computer System map() airspace");
 		exit(1);
 	}
 

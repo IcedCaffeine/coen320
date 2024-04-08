@@ -65,7 +65,7 @@ int Aircraft::initialize() {
 	this->setFileName("plane_" + std::to_string(ID));
 
 	// open shm object
-	shm_fd = shm_open(fileName.c_str(), O_CREAT | O_RDWR, 0666);
+	shm_fd = shm_open(this->getFileName().c_str(), O_CREAT | O_RDWR, 0666);
 	if (shm_fd == -1) {
 		perror("in shm_open() plane");
 		exit(1);
@@ -237,15 +237,14 @@ void Aircraft::updatePosition() {
 
 // stringify plane data members
 void Aircraft::toString() {
-	std::string planeMessage = std::to_string(ID) + ",";
-	planeMessage += std::to_string(arrivalTime) + ",";
+	std::string planeMessage = std::to_string(this->getId()) + ",";
+	planeMessage += std::to_string(this->getArrivalTime()) + ",";
 	planeMessage += std::to_string(this->getX()) + ",";
 	planeMessage += std::to_string(this->getY()) + ",";
 	planeMessage += std::to_string(this->getX()) + ",";
 	planeMessage += std::to_string(this->getSpeedX()) + ",";
 	planeMessage += std::to_string(this->getSpeedY()) + ",";
 	planeMessage += std::to_string(this->getSpeedZ()) + ";";
-
 	this->setPlaneMessage(planeMessage);
 
 }

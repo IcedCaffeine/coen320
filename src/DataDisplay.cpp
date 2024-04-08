@@ -30,11 +30,9 @@ int DataDisplay::initialize() {
 		exit(1);
 	}
 
-	ptr_display = mmap(0, SIZE_SHM_DISPLAY, PROT_READ | PROT_WRITE, MAP_SHARED,
-			shm_display, 0);
+	ptr_display = mmap(0, SIZE_SHM_DISPLAY, PROT_READ | PROT_WRITE, MAP_SHARED, shm_display, 0);
 
 	if (ptr_display == MAP_FAILED) {
-
 		perror("in map() Display");
 		exit(1);
 	}
@@ -44,8 +42,7 @@ int DataDisplay::initialize() {
 
 void DataDisplay::start() {
 	time(&startTime);
-	if (pthread_create(&dataDisplayThread, &attr, &DataDisplay::startDisplay,
-			(void *)this) != EOK) {
+	if (pthread_create(&dataDisplayThread, &attr, &DataDisplay::startDisplay, (void *)this) != EOK) {
 		dataDisplayThread = 0;
 	}
 }
@@ -63,47 +60,56 @@ void *DataDisplay::startDisplay(void *context) {
 
 void *DataDisplay::updateDisplay(void) {
 	// Link to channel
-	int chid = ChannelCreate(0);
-	if (chid == -1) {
+	int channelId = ChannelCreate(0);
+	if (channelId == -1) {
 		std::cout << "couldn't create display channel!\n";
 	}
 
 	// Setup period of 5 seconds
-	Timer timer(chid);
+	Timer timer(channelId);
 	timer.setTimer(DATA_DISPLAY_PERIOD, DATA_DISPLAY_PERIOD);
 
 	// Receive data
-	int rcvid;
-	Message msg;
+	int receiveId;
+	Message message;
 	int logging_counter = 1;
 	std::ofstream out("log");
 
-	while (1) {
-		if (rcvid == 0) {
+	while (true) {
+		if (receiveId == 0) {
 			pthread_mutex_lock(&mutex);
+
+			// Axis and Altitude
+			int axis = 0;
+			int z = 0; // 0=ID, 1=X, 2=Y, 3=Z, 4= Height;
+			std::string x = "";
+			std::string y = "";
+
 			// Parsing buffers
-			int axis = 0, z = 0; // 0=ID, 1=X, 2=Y, 3=Z, 4=Height display control bit;
 			std::string buffer = "";
-			std::string x = "", y = "", display_bit = "";
+			std::string displayBit = "";
 			std::string id = "";
+
 			// Read from shared memory pointer
 			for (int i = 0; i < SIZE_SHM_DISPLAY; i++) {
+				// Read Character
 				char readChar = *((char *)ptr_display + i);
 				if (readChar == 't') {
 					std::cout << "display done\n";
 					time(&finishTime);
 					double execTime = difftime(finishTime, startTime);
 					std::cout << "display execution time: " << execTime << " seconds\n";
-					ChannelDestroy(chid);
+					ChannelDestroy(channelId);
 					out.close();
 					return 0;
 				}
-				// Check for ending character
+
+				// Check Ending Character
 				if (readChar == ';') {
 					break;
-				} else if (readChar == ',' || readChar == '/') {
-					// Check for 2 delimiters
-					// Load buffer according to placement of value
+				}
+				else if(readChar == ','){
+					// Update Based on Buffer
 					if (buffer.length() > 0) {
 						switch (axis) {
 						case 0:
@@ -120,90 +126,126 @@ void *DataDisplay::updateDisplay(void) {
 							z += ALTITUDE;
 							break;
 						case 4:
-							display_bit = buffer;
+							displayBit = buffer;
 							break;
 						}
 					}
-					if (readChar == ',') {
-						axis++;
-						buffer = "";
-					} else if (readChar == '/') {
-						// One plane has finished loading, parsing and reset control values
-						if (grid[(100000 - stoi(y)) / SCALER][stoi(x) / SCALER] == "") {
-							grid[(100000 - stoi(y)) / SCALER][stoi(x) / SCALER] += id;
-						} else {
-							grid[(100000 - stoi(y)) / SCALER][stoi(x) / SCALER] += "\\" + id;
+					axis++;
+					buffer = "";
+				}
+				else if(readChar == '/'){
+					// Update Based on Buffer
+					if (buffer.length() > 0) {
+						switch (axis) {
+						case 0:
+							id = buffer;
+							break;
+						case 1:
+							x = buffer;
+							break;
+						case 2:
+							y = buffer;
+							break;
+						case 3:
+							z = stoi(buffer);
+							z += ALTITUDE;
+							break;
+						case 4:
+							displayBit = buffer;
+							break;
 						}
-						// Height display control
-						if (display_bit == "1") {
-							displayedHeight = displayedHeight + "Plane " + id +
-									" has height of " + std::to_string(z) + " ft\n";
-						}
-						x = "";
-						y = "";
-						z = 0;
-						id = "";
-						display_bit = "";
-						axis = 0;
-						buffer = "";
 					}
-				} else {
-					buffer +=
-							readChar; // Keep loading buffer until delimiter has been detected
+
+					// Add id
+					if(this->grid[(100000 - stoi(y)) / SCALER][stoi(x) / SCALER] == ""){
+						this->setGrid((100000 - stoi(y)) / SCALER, stoi(x) / SCALER, id);
+					}
+					else{
+						this->setGrid((100000 - stoi(y)) / SCALER, stoi(x) / SCALER, "\\" + id);
+					}
+
+					// Update based on Display COntrol
+					if(displayBit == "1"){
+						this->getDisplayedHeight() += "Plane " + id;
+						this->getDisplayedHeight() += " has height of " + std::to_string(z);
+						this->getDisplayedHeight()	+= " ft\n";
+					}
+					x=""; y=""; z=0;
+					displayBit = ""; axis = 0; buffer = "";
+				}
+				else{
+					buffer += readChar; // Load Buffer with Character
 				}
 			}
 			pthread_mutex_unlock(&mutex);
 
 			// Logging the airspace into a log file
-			// Since every period is 5 seconds, we want to wait 6 periods to do this
 			if (logging_counter == 6) {
 				std::cout << "Logging current airspace..." << std::endl;
 				std::streambuf *coutbuf = std::cout.rdbuf(); // save old buf
 				std::cout.rdbuf(out.rdbuf()); // redirect std::cout to out.txt!
-
-				// this used to print to stdout but now we redirected it to out.txt
-				displayMap(); // Display map and height command
+				this->displayMap(); // Display map and height command
 				std::cout << std::endl;
 
 				std::cout.rdbuf(coutbuf); // reset to standard output again
 				logging_counter = 1;
 			}
 
-			// if not during a multiple of 30 second period, just print to stdout
-			// normally
+			// if not during a multiple of 30 second period, just print to stdout normally
 			else {
-				displayMap(); // Display map and height command
+				this->displayMap(); // Display map and height command
 			}
-
 			logging_counter++;
 
-			displayedHeight = ""; // Reset buffer
+			this->setDisplayedHeight(""); // Reset buffer
+
 			// Reset map array
-			memset(grid, 0,
-					sizeof(grid[0][0]) * blockCount *
-					blockCount); // Reset map to 0 for next set
+			this->resetMap();
 		}
-		rcvid = MsgReceive(chid, &msg, sizeof(msg), NULL);
+		receiveId = MsgReceive(channelId, &message, sizeof(message), NULL);
 	}
-	ChannelDestroy(chid);
+	ChannelDestroy(channelId);
 	return 0;
 }
 
 
 // Printing grid
 void DataDisplay::displayMap() {
-	for (int j = 0; j < blockCount; j++) {
-		for (int k = 0; k < blockCount; k++) {
+	// Display Values in Grid
+	for (int i = 0; i < blockCount; i++) {
+		for (int j = 0; j < blockCount; j++) {
 			// Print Empty block if no item
-			if (this->grid[j][k] == "") {
+			if (this->grid[i][j] == "") {
 				std::cout << "_|";
-			} else {
+			}
+			else {
 				// print plane ID if there are items
-				std::cout << this->grid[j][k] << "|";
+				std::cout << this->grid[i][j] << "|";
 			}
 		}
-		std::cout << std::endl;
+		std::cout << "\n";
 	}
+	std::cout << "\n";
 	// Display height
-	printf("%s\n", displayedHeight.c_str());
+	printf("%s\n\n", this->getDisplayedHeight().c_str());
+}
+
+void DataDisplay::resetMap(){
+	for (int i = 0; i < blockCount; i++) {
+		for (int j = 0; j < blockCount; j++) {
+			this->grid[i][j] = "";
+		}
+	}
+}
+
+std::string DataDisplay::getDisplayedHeight() const {
+	return displayedHeight;
+}
+
+void DataDisplay::setDisplayedHeight(std::string displayedHeight) {
+	this->displayedHeight = displayedHeight;
+}
+
+void DataDisplay::setGrid(int row, int column, std::string value){
+	this->grid[row][column] = value;
 }

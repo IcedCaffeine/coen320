@@ -41,6 +41,11 @@ public:
 	DataDisplay();
 	~DataDisplay();
 	
+	// Set & Get
+	std::string getDisplayedHeight() const;
+	void setDisplayedHeight(std::string displayedHeight);
+	void setGrid(int row, int column, std::string value);
+
 	// Roles
 	int initialize();
 	void start();
@@ -48,7 +53,7 @@ public:
 	static void *startDisplay(void *context);
 	void *updateDisplay(void);
 	void displayMap();
-
+	void resetMap();
 };
 
 #endif /* DATADISPLAY_H_ */

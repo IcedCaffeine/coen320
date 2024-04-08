@@ -171,26 +171,18 @@ int ATC::initialize() {
   }
   sprintf((char *)displayPtr, ";");
 
-  // ============ create threaded objects ============
-  // create PSR object with number of planes
-  PrimaryRadar *current_psr = new PrimaryRadar(planes.size());
-  primaryRadar = current_psr;
-
-  SecondaryRadar *current_ssr = new SecondaryRadar(planes.size());
-  secondaryRadar = current_ssr;
-
-  DataDisplay *newDisplay = new DataDisplay(); // Add nb of existing plane (in air)
-  dataDisplay = newDisplay;
-
-  ComputerSystem *newCS = new ComputerSystem(planes.size());
-  computerSystem = newCS;
+  //Create Object thread
+  this->setPrimaryRadar(new PrimaryRadar(planes.size()));
+  this->setSecondaryRadar(new SecondaryRadar(planes.size()));
+  this->setDataDisplay(new DataDisplay());
+  this->setComputerSystem(new ComputerSystem(planes.size()));
 
   return 0; // set to error code if any
 }
 
 int ATC::start() {
 
-	// start threaded objects
+	// Start Object threads
 	this->getPrimaryRadar()->start();
 	this->getSecondaryRadar()->start();
 	this->getDataDisplay()->start();
@@ -200,7 +192,7 @@ int ATC::start() {
 		plane->start();
 	}
 
-	// join threaded objects
+	// End Object Threads
 	for (Aircraft *plane : this->getPlanes()) {
 		plane->stop();
 	}
@@ -228,11 +220,8 @@ int ATC::readInput() {
 
   int ID, arrivalTime, arrivalX, arrivalY, arrivalZ, arrivalSpeedX,arrivalSpeedY, arrivalSpeedZ;
   std::string separator = " ";
-  while (inputFileStream >> ID >> arrivalTime >> arrivalX >>
-         arrivalY >> arrivalZ >> arrivalSpeedX >> arrivalSpeedY >>
-         arrivalSpeedZ)
+  while (inputFileStream >> ID >> arrivalTime >> arrivalX >> arrivalY >> arrivalZ >> arrivalSpeedX >> arrivalSpeedY >> arrivalSpeedZ)
 	{
-
 		int position[3] = {arrivalX, arrivalY, arrivalZ};
 		int velocity[3] = {arrivalSpeedX, arrivalSpeedY, arrivalSpeedZ};
 
