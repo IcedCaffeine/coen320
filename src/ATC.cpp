@@ -78,8 +78,7 @@ int ATC::initialize() {
   ftruncate(shm_waitingPlanes, SIZE_SHM_PSR);
 
   // map shm
-  waitingPtr = mmap(0, SIZE_SHM_PSR, PROT_READ | PROT_WRITE, MAP_SHARED,
-                    shm_waitingPlanes, 0);
+  waitingPtr = mmap(0, SIZE_SHM_PSR, PROT_READ | PROT_WRITE, MAP_SHARED, shm_waitingPlanes, 0);
   if (waitingPtr == MAP_FAILED) {
     printf("map failed waiting planes\n");
     return -1;
@@ -89,14 +88,11 @@ int ATC::initialize() {
   int i = 0;
   for (Aircraft *plane : this->getPlanes()) {
     sprintf((char *)waitingPtr + i, "%s,", plane->getFileName().c_str());
-
-    // move index
     i += (strlen(plane->getFileName().c_str()) + 1);
   }
   sprintf((char *)waitingPtr + i - 1, ";"); // file termination character
 
-  // ============ initialize shm for flying planes (contains no planes)
-  // ============
+  //  initialize shm for flying planes (contains no planes)
   shm_flyingPlanes = shm_open("flying_planes", O_CREAT | O_RDWR, 0666);
   if (shm_flyingPlanes == -1) {
     perror("in shm_open() ATC: flying planes");
@@ -114,7 +110,6 @@ int ATC::initialize() {
   }
   sprintf((char *)flyingPlanesPtr, ";");
 
-  // ============ initialize shm for airspace (compsys <-> ssr) ============
   shm_airspace = shm_open("airspace", O_CREAT | O_RDWR, 0666);
   if (shm_airspace == -1) {
     perror("in shm_open() ATC: airspace");
@@ -133,7 +128,7 @@ int ATC::initialize() {
   }
   sprintf((char *)airspacePtr, ";");
 
-  // ============ initialize shm for period update ============
+  // initialize shm for period update
   shm_period = shm_open("period", O_CREAT | O_RDWR, 0666);
   if (shm_period == -1) {
     perror("in shm_open() ATC: period");
@@ -154,7 +149,7 @@ int ATC::initialize() {
   std::string CSPeriod = std::to_string(per);
   sprintf((char *)periodPtr, CSPeriod.c_str());
 
-  // ============ initialize shm for display ============
+  // initialize shm for display
   shm_display = shm_open("display", O_CREAT | O_RDWR, 0666);
 
   // set shm size
@@ -171,10 +166,10 @@ int ATC::initialize() {
   sprintf((char *)displayPtr, ";");
 
   //Create Object thread
-  this->setPrimaryRadar(new PrimaryRadar(planes.size()));
-  this->setSecondaryRadar(new SecondaryRadar(planes.size()));
+  this->setPrimaryRadar(new PrimaryRadar(this->getPlanes().size()));
+  this->setSecondaryRadar(new SecondaryRadar(this->getPlanes().size()));
   this->setDataDisplay(new DataDisplay());
-  this->setComputerSystem(new ComputerSystem(planes.size()));
+  this->setComputerSystem(new ComputerSystem(this->getPlanes().size()));
 
   return 0; // set to error code if any
 }

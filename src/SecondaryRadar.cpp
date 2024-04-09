@@ -422,9 +422,8 @@ bool SecondaryRadar::getPlaneData() {
 	return write;
 }
 
-// ================= write new flying planes shm =================
+// write new flying planes shm
 void SecondaryRadar::writeFlyingPlanes() {
-	// new flying planes buffer
 	std::string currentAirspace = "";
 
 	int j = 0;

@@ -133,8 +133,7 @@ int ComputerSystem::initialize() {
 	}
 
 
-	displayPtr = mmap(0, SIZE_SHM_DISPLAY, PROT_READ | PROT_WRITE, MAP_SHARED,
-			shm_display, 0);
+	displayPtr = mmap(0, SIZE_SHM_DISPLAY, PROT_READ | PROT_WRITE, MAP_SHARED,shm_display, 0);
 	if (displayPtr == MAP_FAILED) {
 		perror("in copmsys map() display");
 		exit(1);

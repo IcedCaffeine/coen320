@@ -110,10 +110,12 @@ int PrimaryRadar::initialize(int numberOfPlanes) {
 	}
 
 	std::string fileDataBuffer = "";
+	std::vector<std::string> waitFile = this->getWaitingFileNames();
+
 	for (int i = 0; i < SIZE_SHM_PSR; i++) {
 		char readChar = *((char *)waitingPlanesPtr + i);
 		if (readChar == ',') {
-			this->getWaitingFileNames().push_back(fileDataBuffer);
+			waitFile.push_back(fileDataBuffer);
 			int shm_plane = shm_open(fileDataBuffer.c_str(), O_RDONLY, 0666);
 			if (shm_plane == -1) {
 				perror("in shm_open() Primary Radar plane");
@@ -130,7 +132,7 @@ int PrimaryRadar::initialize(int numberOfPlanes) {
 			fileDataBuffer = "";
 			continue;
 		} else if (readChar == ';') {
-			this->getWaitingFileNames().push_back(fileDataBuffer);
+			waitFile.push_back(fileDataBuffer);
 
 			// open shm for current plane
 			int shm_plane = shm_open(fileDataBuffer.c_str(), O_RDONLY, 0666);
@@ -153,6 +155,9 @@ int PrimaryRadar::initialize(int numberOfPlanes) {
 
 		fileDataBuffer += readChar;
 	}
+	this->setWaitingFileNames(waitFile);
+
+	std::cout << "Waiting File Name Count" << this->getWaitingFileNames().size() << "\n";
 
 	shm_flyingPlanes = shm_open("flying_planes", O_RDWR, 0666);
 	if (shm_flyingPlanes == -1) {
@@ -202,7 +207,8 @@ void *PrimaryRadar::OperatePrimaryRadar(void) {
 			pthread_mutex_lock(&mutex);
 
 			this->updatePeriod();
-			if (this->readWaitingPlanes()) {
+			bool move = this->readWaitingPlanes();
+			if (move) {
 				this->writeFlyingPlanes();
 			}
 
@@ -240,13 +246,16 @@ void PrimaryRadar::updatePeriod() {
 
 
 bool PrimaryRadar::readWaitingPlanes() {
+	// Initialize Values
+	std::vector<std::string> waitPlanes = this->getWaitingFileNames();
+	std::vector<std::string> flyingPlanes = this->getFlyingFileNames();
 	bool move = false;
 	int i = 0;
 	auto it = planePtrs.begin();
 	while (it != planePtrs.end()) {
 		int j = 0;
 		for (; j < 4; j++) {
-			if (*((char *)*it + j) == ',') {
+			if (*((char *)*it + j) != ',') {
 				break;
 			}
 		}
@@ -258,18 +267,20 @@ bool PrimaryRadar::readWaitingPlanes() {
 		if (curr_arrival_time <= t_current) {
 			if(!this->getWaitingFileNames().empty()){
 				move = true;
-				this->getFlyingFileNames().push_back(this->getWaitingFileNames().at(i));
-				this->getWaitingFileNames().erase(this->getWaitingFileNames().begin() + i);
-
+				flyingPlanes.push_back(waitPlanes.at(i));
+				waitPlanes.erase(waitPlanes.begin() + i);
 				it = planePtrs.erase(it);
-				this->setNumWaitingPlanes(this->getNumWaitingPlanes() - 1);
+				this->setNumWaitingPlanes(waitPlanes.size());
 			}
+
 		}
 		else {
 			i++; // only increment if no plane to transfer
 			++it;
 		}
 	}
+	this->setWaitingFileNames(waitPlanes);
+	this->setFlyingFileNames(flyingPlanes);
 	return move;
 }
 
