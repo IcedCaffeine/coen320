@@ -52,7 +52,7 @@ private:
 	void *navigatePlane(void); // Update Plane Position & Speed
 	int checkLimits(); // check airspace limits for operation termination
 	void print(); // print plane info
-	void answerCommunications(); // Check Comms for Commands
+	void answerCommunications(); // Check Communication for Commands
 	void updatePosition(); // Update position
 	void toString();
 

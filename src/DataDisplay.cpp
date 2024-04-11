@@ -200,22 +200,18 @@ void *DataDisplay::updateMap(void) {
 
 // Printing grid
 void DataDisplay::displayMap() {
-	// Display Values in Grid
 	for (int i = 0; i < blockCount; i++) {
 		for (int j = 0; j < blockCount; j++) {
-			// Print Empty block if no item
 			if (this->getGrid(i,j) == "") {
 				std::cout << "_|";
 			}
 			else {
-				// print plane ID if there are items
 				std::cout << this->getGrid(i,j) << "|";
 			}
 		}
 		std::cout << "\n";
 	}
 	std::cout << "\n";
-	// Display height
 	printf("%s\n\n", this->getDisplayedHeight().c_str());
 }
 
