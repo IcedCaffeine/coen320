@@ -6,7 +6,7 @@ Aircraft::Aircraft(int ID, int arrivalTime, int position[3], int speed[3]) {
 	this->arrivalTime = arrivalTime;
 	this->ID = ID;
 
-	// Positons
+	// Positions
 	this->x = position[0];
 	this->y = position[1];
 	this->z = position[2];
@@ -24,57 +24,36 @@ Aircraft::Aircraft(int ID, int arrivalTime, int position[3], int speed[3]) {
 }
 
 Aircraft::~Aircraft() {
-	shm_unlink(fileName.c_str());
+	shm_unlink(this->getFileName().c_str());
+	shm_unlink(this->getFileName().c_str());
 	pthread_mutex_destroy(&mutex);
 }
 
-int Aircraft::start() {
-	time(&startTime);
-	if (pthread_create(&thread, &attr, &Aircraft::startThread, (void *)this) !=EOK) {
-		thread = 0;
-	}
-
-	return 0;
-}
-
-bool Aircraft::stop() {
-	pthread_join(thread, NULL);
-	return 0;
-}
-
-void *Aircraft::startThread(void *context) {
-	// set priority
-	((Aircraft *)context)->flyPlane();
-	return 0;
-}
 
 // initialize thread and shm members
 int Aircraft::initialize() {
 	// set thread in detached state
-	int rc = pthread_attr_init(&attr);
-	if (rc) {
-		printf("ERROR, RC from pthread_attr_init() is %d \n", rc);
+	int received = pthread_attr_init(&attr);
+	if (received) {
+		printf("Error : pthread_attr_init() RC = %d \n", received);
 	}
 
-	rc = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-	if (rc) {
-		printf("ERROR; RC from pthread_attr_setdetachstate() is %d \n", rc);
+	received = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+	if (received) {
+		printf("Error : pthread_attr_setdetachstate() RC = %d \n", received);
 	}
 
 	// Setup File Name
-	this->setFileName("plane_" + std::to_string(ID));
+	this->setFileName(std::to_string(ID));
 
 	// open shm object
 	shm_fd = shm_open(this->getFileName().c_str(), O_CREAT | O_RDWR, 0666);
 	if (shm_fd == -1) {
-		perror("in shm_open() plane");
+		perror("in shm_open() fileData");
 		exit(1);
 	}
-
-	// set the size of shm
 	ftruncate(shm_fd, SIZE_SHM_PLANES);
 
-	// map shm
 	ptr = mmap(0, SIZE_SHM_PLANES, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
 	if (ptr == MAP_FAILED) {
 		printf("map failed\n");
@@ -83,49 +62,43 @@ int Aircraft::initialize() {
 
 	// update string of plane data
 	this->toString();
-
-	// initial write + space for comm system
 	sprintf((char *)ptr, "%s0;", this->getPlaneMessage().c_str());
-
 	return 0;
 }
 
-// update position every second from position and speed
-void *Aircraft::flyPlane(void) {
-	// create channel to link timer
+
+void *Aircraft::navigatePlane(void) {
+	// Initialize Message Buffers
+	int receiveId;
+	Message msg;
+
+	// Link Timer to new Channel
 	int chid = ChannelCreate(0);
 	if (chid == -1) {
 		std::cout << "couldn't create channel!\n";
 	}
-
-	// create timer and set offset and period
 	Timer timer(chid);
 	timer.setTimer(this->getArrivalTime() * 1000000, AIRCRAFT_PERIOD);
 
-	// buffers for message from timer
-	int receiveId;
-	Message msg;
-
-	bool start = true;
+	bool begin = true;
 	while (true) {
-		if (start) {
-			start = false; // first cycle, wait for arrival time
-		} else {
+		if (begin) {
+			begin = false; // first cycle, wait for arrival time
+		}
+		else {
 			if (receiveId == 0) {
 				pthread_mutex_lock(&mutex);
 
-				// check comm system for potential command
-				this->answerComm();
-
-				// update position based on speed
+				// Check Comm and Update
+				this->answerCommunications();
 				this->updatePosition();
 
-				// check for airspace limits, write to shm
-				if (checkLimits() == 0) {
+				// Check Airspace limits & share to memory
+				int limit = checkLimits();
+				if (limit == 0) {
 					std::cout << this->getFileName().c_str() << " terminated\n";
 					time(&finishTime);
-					double executionTime = difftime(finishTime, startTime);
-					std::cout << this->getFileName().c_str() << " execution time: " << executionTime << " seconds\n";
+					std::cout << this->getFileName().c_str() << " execution time: " << difftime(finishTime, startTime) << "s\n";
 					ChannelDestroy(chid);
 					return 0;
 				}
@@ -133,17 +106,15 @@ void *Aircraft::flyPlane(void) {
 				pthread_mutex_unlock(&mutex);
 			}
 		}
-		// wait until next timer pulse
 		receiveId = MsgReceive(chid, &msg, sizeof(msg), NULL);
 	}
 
 	ChannelDestroy(chid);
-
 	return 0;
 }
 
 // check comm system for potential commands
-void Aircraft::answerComm() {
+void Aircraft::answerCommunications() {
 	// check if executing command
 	if (this->isCommandInProgress()) {
 		// decrement counter
@@ -159,21 +130,22 @@ void Aircraft::answerComm() {
 	// find end of plane info
 	int i = 0;
 	char readCharacter;
-	for (; i < SIZE_SHM_PLANES; i++) {
+	while(i < SIZE_SHM_PLANES){
 		readCharacter = *((char *)ptr + i);
 		if (readCharacter == ';') {
 			break; // found end
 		}
+		i++;
 	}
 
-	// check for command presence
-	if (*((char *)ptr + i + 1) == ';' || *((char *)ptr + i + 1) == '0') {
+	// check for Command
+	if (*((char *)ptr + i + 1) == '0' || *((char *)ptr + i + 1) == ';') {
 		return;
 	}
 
 	// set index to next
 	i++;
-	int startIndex = i;
+	int index = i;
 	readCharacter = *((char *)ptr + i);
 	std::string buffer = "";
 	while (readCharacter != ';') {
@@ -187,31 +159,27 @@ void Aircraft::answerComm() {
 	int currentParameter;
 	int speed[3];
 	for (int j = 0; j <= (int)buffer.size(); j++) {
-		char currentCharacter = buffer[j];
-
-		switch (currentCharacter) {
-		case ';':
-			speed[currentParameter] = std::stoi(parseBuffer);
-			break;
-		case '/':
-			speed[currentParameter] = std::stoi(parseBuffer);
-			parseBuffer = "";
-			continue;
-		case ',':
-			parseBuffer = "";
-			continue;
-		case 'x':
+		if(buffer[j] == 'x'){
 			currentParameter = 0;
-			continue;
-		case 'y':
+		}
+		else if(buffer[j] == 'y'){
 			currentParameter = 1;
-			continue;
-		case 'z':
+		}
+		else if(buffer[j] == 'z'){
 			currentParameter = 2;
-			continue;
-		default:
-			parseBuffer += currentCharacter;
-			continue;
+		}
+		else if(buffer[j] == '/'){
+			speed[currentParameter] = std::stoi(parseBuffer);
+			parseBuffer = "";
+		}
+		else if(buffer[j] == ';'){
+			speed[currentParameter] = std::stoi(parseBuffer);
+		}
+		else if(buffer[j] == ','){
+			parseBuffer = "";
+		}
+		else{
+			parseBuffer += buffer[j];
 		}
 	}
 	this->setSpeedX(speed[0]);
@@ -224,7 +192,7 @@ void Aircraft::answerComm() {
 	this->setCommandInProgress(true);
 
 	// remove command
-	sprintf((char *)ptr + startIndex, "0;");
+	sprintf((char *)ptr + index, "0;");
 }
 
 // update position based on speed
@@ -364,4 +332,24 @@ int Aircraft::getZ() const {
 
 void Aircraft::setZ(int z) {
 	this->z = z;
+}
+
+int Aircraft::start() {
+	time(&startTime);
+	if (pthread_create(&thread, &attr, &Aircraft::startThread, (void *)this) !=EOK) {
+		thread = 0;
+	}
+
+	return 0;
+}
+
+bool Aircraft::stop() {
+	pthread_join(thread, NULL);
+	return 0;
+}
+
+void *Aircraft::startThread(void *context) {
+	// set priority
+	((Aircraft *)context)->navigatePlane();
+	return 0;
 }

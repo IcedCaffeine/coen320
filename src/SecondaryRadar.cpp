@@ -1,7 +1,6 @@
 #include "SecondaryRadar.h"
 
-#include <sys/resource.h>
-#include <sys/types.h>
+
 
 SecondaryRadar::SecondaryRadar(int numberOfPlanes) {
 	this->currentPeriod = SECONDARY_SOURCE_RADAR_PERIOD;
@@ -79,32 +78,31 @@ void SecondaryRadar::setTimer(Timer *timer) {
 }
 
 void *SecondaryRadar::startSecondaryRadar(void *args) {
-	((SecondaryRadar *)args)->operateSecondaryRadar();
+	((SecondaryRadar *)args)->setupSecondaryRadar();
 	return NULL;
 }
 
 int SecondaryRadar::initialize(int numberOfPlanes) {
 	this->setNumberOfPlanes(numberOfPlanes);
 
-	// set thread in detached state
-	int rc = pthread_attr_init(&attr);
-	if (rc) {
-		printf("ERROR, RC from pthread_attr_init() is %d \n", rc);
+	int receive = pthread_attr_init(&attr);
+	if (receive) {
+		printf("ERROR, RC from pthread_attr_init() is %d \n", receive);
 	}
 
-	rc = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-	if (rc) {
-		printf("ERROR; RC from pthread_attr_setdetachstate() is %d \n", rc);
+	receive = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+	if (receive) {
+		printf("ERROR; RC from pthread_attr_setdetachstate() is %d \n", receive);
 	}
 
-	// open list of waiting planes shm
+	// Setup Waiting PLanes
 	int shm_waitingPlanes = shm_open("waiting_planes", O_RDONLY, 0666);
 	if (shm_waitingPlanes == -1) {
-		perror("in shm_open() SSR waiting planes");
+		perror("in shm_open() Secondary Radar waiting planes");
 		exit(1);
 	}
 
-	// set new limit of max open files to 10000 to allow for more than 200 planes
+	// Change Maximum Limit
 	struct rlimit currentLimit, newLimits;
 	pid_t currentId = getpid();
 	int pid = (int)currentId;
@@ -112,32 +110,30 @@ int SecondaryRadar::initialize(int numberOfPlanes) {
 	newLimits.rlim_max = 10000;
 	prlimit(pid, RLIMIT_NOFILE, &newLimits, &currentLimit);
 
-	// map waiting planes shm
 	void *waitingPlanesPtr = mmap(0, SIZE_SHM_PSR, PROT_READ, MAP_SHARED, shm_waitingPlanes, 0);
 	if (waitingPlanesPtr == MAP_FAILED) {
-		perror("in map() SSR waiting planes");
+		perror("in map() Secondary Radar waiting planes");
 		exit(1);
 	}
 
+	// Write to Waiting Planes
 	std::string fileDataBuffer = "";
 	for (int i = 0; i < SIZE_SHM_PSR; i++) {
-		char readChar = *((char *)waitingPlanesPtr + i);
+		char readCharacter = *((char *)waitingPlanesPtr + i);
 
-		if (readChar == ',') {
+		if (readCharacter == ',') {
 			this->getWaitingFileNames().push_back(fileDataBuffer);
 
-			// open shm for current plane
+			// Setup Plane Memory
 			int shm_plane = shm_open(fileDataBuffer.c_str(), O_RDONLY, 0666);
 			if (shm_plane == -1) {
-				perror("in shm_open() SSR plane");
+				perror("in shm_open() Secondary Radar plane");
 
 				exit(1);
 			}
-
-			// map memory for current plane
 			void *ptr = mmap(0, SIZE_SHM_PLANES, PROT_READ, MAP_SHARED, shm_plane, 0);
 			if (ptr == MAP_FAILED) {
-				perror("in map() SSR plane");
+				perror("in map() Secondary Radar plane");
 				exit(1);
 			}
 
@@ -146,21 +142,19 @@ int SecondaryRadar::initialize(int numberOfPlanes) {
 			continue;
 
 		}
-		else if (readChar == ';') {
+		else if (readCharacter == ';') {
 			this->getWaitingFileNames().push_back(fileDataBuffer);
 
-			// open shm for current plane
+			// Setup Planes
 			int shm_plane = shm_open(fileDataBuffer.c_str(), O_RDONLY, 0666);
 			if (shm_plane == -1) {
-				perror("in shm_open() SSR plane");
+				perror("in shm_open() Secondary Radar plane");
 
 				exit(1);
 			}
-
-			// map memory for current plane
 			void *ptr = mmap(0, SIZE_SHM_PLANES, PROT_READ, MAP_SHARED, shm_plane, 0);
 			if (ptr == MAP_FAILED) {
-				perror("in map() SSR plane");
+				perror("in map() Secondary Radar plane");
 				exit(1);
 			}
 
@@ -168,74 +162,74 @@ int SecondaryRadar::initialize(int numberOfPlanes) {
 			break;
 		}
 
-		fileDataBuffer += readChar;
+		fileDataBuffer += readCharacter;
 	}
 
-	// open list of waiting planes shm
+	// Setup Planes
 	shm_flyingPlanes = shm_open("flying_planes", O_RDWR, 0666);
 	if (shm_flyingPlanes == -1) {
-		perror("in shm_open() SSR: flying planes");
+		perror("in shm_open() Secondary Radar: flying planes");
 		exit(1);
 	}
-
 	flyingPlanesPtr = mmap(0, SIZE_SHM_SSR, PROT_READ | PROT_WRITE, MAP_SHARED,
 			shm_flyingPlanes, 0);
 	if (flyingPlanesPtr == MAP_FAILED) {
-		perror("in map() SSR: flying planes");
+		perror("in map() Secondary Radar: flying planes");
 		exit(1);
 	}
 
 	// open airspace shm
 	shm_airspace = shm_open("airspace", O_RDWR, 0666);
 	if (shm_airspace == -1) {
-		perror("in shm_open() SSR: airspace");
+		perror("in shm_open() Secondary Radar: airspace");
 		exit(1);
 	}
 
 	// map airspace shm
-	airspacePtr = mmap(0, SIZE_SHM_AIRSPACE, PROT_READ | PROT_WRITE, MAP_SHARED,
-			shm_airspace, 0);
+	airspacePtr = mmap(0, SIZE_SHM_AIRSPACE, PROT_READ | PROT_WRITE, MAP_SHARED, shm_airspace, 0);
 	if (airspacePtr == MAP_FAILED) {
-		perror("in map() SSR: airspace");
+		perror("in map() Secondary Radar: airspace");
 		exit(1);
 	}
 
 	// open period shm
 	shm_period = shm_open("period", O_RDONLY, 0666);
 	if (shm_period == -1) {
-		perror("in shm_open() SSR: period");
+		perror("in shm_open() Secondary Radar: period");
 		exit(1);
 	}
 
 	// map airspace shm
 	periodPtr = mmap(0, SIZE_SHM_PERIOD, PROT_READ, MAP_SHARED, shm_period, 0);
 	if (periodPtr == MAP_FAILED) {
-		perror("in map() SSR: period");
+		perror("in map() Secondary Radar: period");
 		exit(1);
 	}
 
 	return 0;
 }
 
-void *SecondaryRadar::operateSecondaryRadar(void) {
+void *SecondaryRadar::setupSecondaryRadar(void) {
 	// create channel to communicate with timer
 	int chid = ChannelCreate(0);
 	if (chid == -1) {
 		std::cout << "couldn't create channel!\n";
 	}
 
+	// Setup Timer
 	this->setTimer(new Timer(chid));
 	this->getTimer()->setTimer(SECONDARY_SOURCE_RADAR_PERIOD, SECONDARY_SOURCE_RADAR_PERIOD);
 
+	// Setup Message
 	int receiveId;
 	Message message;
 
-	while (1) {
+	while (true) {
 		if (receiveId == 0) {
 			// lock mutex
 			pthread_mutex_lock(&mutex);
 
-			this->updatePeriod();
+			this->updateTimer();
 			if(this->readFlyingPlanes() || this->getPlaneData()){
 				this->writeFlyingPlanes();
 			}
@@ -244,10 +238,9 @@ void *SecondaryRadar::operateSecondaryRadar(void) {
 
 			// check for termination
 			if (this->getNumberOfPlanes() <= 0) {
-				std::cout << "ssr done\n";
+				std::cout << "Secondary Radar done\n";
 				time(&finishTime);
-				double execTime = difftime(finishTime, startTime);
-				std::cout << "Secondary Radar execution time: " << execTime << " seconds\n";
+				std::cout << "Secondary Radar execution time: " << difftime(finishTime, startTime) << " seconds\n";
 				sprintf((char *)airspacePtr, "terminated");
 				ChannelDestroy(chid);
 				return 0;
@@ -262,7 +255,7 @@ void *SecondaryRadar::operateSecondaryRadar(void) {
 }
 
 // update ssr period based on period shm
-void SecondaryRadar::updatePeriod() {
+void SecondaryRadar::updateTimer() {
 	int newPeriod = atoi((char *)periodPtr);
 	if (newPeriod != this->getCurrentPeriod()) {
 		this->setCurrentPeriod(newPeriod);
@@ -275,8 +268,8 @@ bool SecondaryRadar::readFlyingPlanes() {
 	std::string fileDataBuffer = "";
 
 	for (int i = 0; i < SIZE_SHM_SSR; i++) {
-		char readChar = *((char *)flyingPlanesPtr + i);
-		if (readChar == ';') {
+		char readCharacter = *((char *)flyingPlanesPtr + i);
+		if (readCharacter == ';') {
 			if (i == 0) {
 				break; // no flying planes
 			}
@@ -314,7 +307,7 @@ bool SecondaryRadar::readFlyingPlanes() {
 			break;
 		}
 		// found a plane, open shm
-		else if (readChar == ',') {
+		else if (readCharacter == ',') {
 			// check if plane was already in list
 			bool inFile = false;
 
@@ -353,7 +346,7 @@ bool SecondaryRadar::readFlyingPlanes() {
 		}
 
 		// just add the char to the buffer
-		fileDataBuffer += readChar;
+		fileDataBuffer += readCharacter;
 	}
 
 	return write;
@@ -361,7 +354,6 @@ bool SecondaryRadar::readFlyingPlanes() {
 
 bool SecondaryRadar::getPlaneData() {
 	bool write = false;
-	// buffer for all plane info
 	std::string airspaceBuffer = "";
 
 	int i = 0;
@@ -370,55 +362,37 @@ bool SecondaryRadar::getPlaneData() {
 		std::string readBuffer = "";
 		char readCharacter = *((char *)*it);
 
-		// remove plane (terminated)
+		// Remove PLanes
 		if (readCharacter == 't') {
 			write = true; // found plane to remove
-
 			shm_unlink(this->getFlyingFileNames().at(i).c_str());
-			// remove current fd from flying planes fd vector
 			this->getFlyingFileNames().erase(this->getFlyingFileNames().begin() + i);
-
-			// remove current plane from ptr vector
 			it = planePtrs.erase(it);
-
-			// reduce number of planes
 			this->setNumberOfPlanes(this->getNumberOfPlanes()-1);
 		}
-		// plane not terminated, read all data and add to buffer for airspace
 		else {
 			int j = 0;
 			for (; j < SIZE_SHM_PLANES; j++) {
 				char readChar = *((char *)*it + j);
-
-				// end of plane shm
 				if (readChar == ';') {
 					break;
 				}
-
-				// if not first plane read, append "/" to front (plane separator)
 				if (i != 0 && j == 0) {
-					readBuffer += "/"; // plane separator
+					readBuffer += "/";
 				}
-				// add current character to buffer
 				readBuffer += readCharacter;
 			}
-			// no planes
 			if (j == 0) {
 				break;
 			}
-			i++; // only increment if no plane to terminate and plane info added
+			i++;
 			++it;
 		}
-
-		// add current buffer to buffer for airspace shm
 		airspaceBuffer += readBuffer;
 	}
 
-	// termination character for airspace write
 	airspaceBuffer += ";";
-
 	sprintf((char *)airspacePtr, "%s", airspaceBuffer.c_str());
-
 	return write;
 }
 

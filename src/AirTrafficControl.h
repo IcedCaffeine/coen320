@@ -1,60 +1,61 @@
-#ifndef ATC_H_
-#define ATC_H_
+#ifndef AIR_TRAFFIC_CONTROL_H
+#define AIR_TRAFFIC_CONTROL_H
 
+// C++ Library
+#include <fstream>
+#include <string>
+#include <list>
+#include <vector>
+
+// C++ Header
 #include <errno.h>
 #include <fcntl.h>
-#include <fstream>
-#include <list>
-#include <pthread.h>
-#include <stdio.h>
-#include <string>
 #include <sys/mman.h>
 #include <sys/neutrino.h>
 #include <sys/siginfo.h>
+#include <pthread.h>
+#include <stdio.h>
 #include <time.h>
 #include <vector>
-#include "Aircraft.h"
 
+// Objects Header
+#include "Aircraft.h"
+#include "PrimaryRadar.h"
+#include "SecondaryRadar.h"
 #include "ComputerSystem.h"
 #include "DataDisplay.h"
 #include "Limits.h"
-#include "PrimaryRadar.h"
-#include "SecondaryRadar.h"
 #include "Timer.h"
 
-class ATC {
+class AirTrafficControl {
 private:
 	// Components
-	  std::vector<Aircraft *> planes; // vector of plane objects
+
 	  PrimaryRadar *primaryRadar;
 	  SecondaryRadar *secondaryRadar;
 	  DataDisplay *dataDisplay;
 	  ComputerSystem *computerSystem;
+	  std::vector<Aircraft *> planes; // vector of plane objects
 
 	  // timers
 	  time_t startTime;
 	  time_t endTime;
 
 	  // shm
-	  int shm_waitingPlanes;
-	  void *waitingPtr;
-	  int shm_flyingPlanes;
-	  void *flyingPlanesPtr;
-	  int shm_airspace;
-	  void *airspacePtr;
-	  int shm_period;
-	  void *periodPtr;
-	  int shm_display;
-	  void *displayPtr;
+	  int shm_waitingPlanes,shm_flyingPlanes,shm_period,shm_display,shm_airspace;
+	  void *waitingPtr,*flyingPlanesPtr,*periodPtr,*displayPtr,*airspacePtr;
 
 	  // thread
 	  pthread_mutex_t mutex;
 
+protected:
+	int readInput();
+	int initialize();
 
 public:
 	// Constructor and Destructor
-	ATC();
-	~ATC();
+	AirTrafficControl();
+	~AirTrafficControl();
 
 	// Set & Get
 	ComputerSystem *getComputerSystem() const;
@@ -71,10 +72,6 @@ public:
 	// Role
 	int start();
 
-
-protected:
-  int readInput();
-  int initialize();
 };
 
-#endif /* ATC_H_ */
+#endif /* AIR_TRAFFIC_CONTROL_H */

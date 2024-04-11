@@ -1,17 +1,5 @@
-#ifndef LIMITS_H_
-#define LIMITS_H_
-
-// Airspace Specifications
-#define SIZE_SHM_PLANES 128
-#define OFFSET 1000000
-#define MIN_X_AIRSPACE 0
-#define MAX_X_AIRSPACE 100000
-#define MIN_Y_AIRSPACE 0
-#define MAX_Y_AIRSPACE 100000
-#define MIN_Z_AIRSPACE 0
-#define MAX_Z_AIRSPACE 25000
-#define ALTITUDE 15000
-#define AIRCRAFT_PERIOD 1000000
+#ifndef LIMITS_H
+#define LIMITS_H
 
 // Radar
 #define SIZE_SHM_PSR 4096
@@ -46,5 +34,17 @@
 // Message reply definitions
 #define MT_OK 0       // Message to client
 #define MT_TIMEDOUT 1 // Message to client
+
+// Airspace Specifications
+#define SIZE_SHM_PLANES 128
+#define OFFSET 1000000
+#define MIN_X_AIRSPACE 0
+#define MAX_X_AIRSPACE 100000
+#define MIN_Y_AIRSPACE 0
+#define MAX_Y_AIRSPACE 100000
+#define MIN_Z_AIRSPACE 0
+#define MAX_Z_AIRSPACE 25000
+#define ALTITUDE 15000
+#define AIRCRAFT_PERIOD 1000000
 
 #endif /* LIMITS_H_ */

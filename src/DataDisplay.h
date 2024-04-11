@@ -1,16 +1,21 @@
-#ifndef DATADISPLAY_H_
-#define DATADISPLAY_H_
+#ifndef DATA_DISPLAY_H
+#define DATA_DISPLAY_H
 
-#include <errno.h>
-#include <fcntl.h>
+
+// C++ Library
 #include <fstream>
 #include <iostream>
+
+// C++ Header
+#include <errno.h>
+#include <fcntl.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <time.h>
 
+// Object
 #include "Limits.h"
 #include "Timer.h"
 
@@ -45,15 +50,16 @@ public:
 	std::string getDisplayedHeight() const;
 	void setDisplayedHeight(std::string displayedHeight);
 	void setGrid(int row, int column, std::string value);
+	std::string getGrid(int row, int column);
 
 	// Roles
 	int initialize();
 	void start();
 	int stop();
-	static void *startDisplay(void *context);
-	void *updateDisplay(void);
+	static void *startThread(void *context);
+	void *updateMap(void);
 	void displayMap();
 	void resetMap();
 };
 
-#endif /* DATADISPLAY_H_ */
+#endif /* DATADISPLAY_H */

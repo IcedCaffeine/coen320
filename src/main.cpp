@@ -1,5 +1,12 @@
+// C++ Hraders
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <limits.h>
+
+
+// Objects
 #include "Aircraft.h"
-#include "ATC.h"
 #include "Limits.h"
 #include "ComputerSystem.h"
 #include "DataDisplay.h"
@@ -7,11 +14,7 @@
 #include "PrimaryRadar.h"
 #include "SecondaryRadar.h"
 #include "Timer.h"
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <limits.h>
+#include "AirTrafficControl.h"
 
 /* Global Variables */
 // Class Objects
@@ -42,6 +45,6 @@ pthread_mutex_t mutex;
 
 
 int main() {
-  ATC atc;
+  AirTrafficControl atc;
   return 0;
 }

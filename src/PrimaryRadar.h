@@ -1,17 +1,23 @@
-#ifndef PRIMARYRADAR_H_
-#define PRIMARYRADAR_H_
+#ifndef PRIMARY_RADAR_H
+#define PRIMARY_RADAR_H
 
-#include <fcntl.h>
+
+// C++ Libraries
 #include <fstream>
 #include <iostream>
-#include <stdio.h>
-#include <stdlib.h>
+#include <vector>
+
+// C++ Headers
+#include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/types.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
-#include <vector>
-#include "Aircraft.h"
 
+
+// Object Headers
+#include "Aircraft.h"
 #include "Limits.h"
 #include "SecondaryRadar.h"
 #include "Timer.h"
@@ -44,8 +50,8 @@ private:
 
 	// Roles
 	int initialize(int numberOfPlanes);
-	void *OperatePrimaryRadar(void);
-	void updatePeriod();
+	void *setupPrimaryRadar(void);
+	void updateTimer();
 	bool readWaitingPlanes();
 	void writeFlyingPlanes();
 
@@ -56,7 +62,7 @@ public:
 	// Role
 	void start();
 	int stop();
-	static void *startPrimaryRadar(void *context);
+	static void *startThread(void *context);
 
 	// Set and Get
 	int getCurrPeriod() const;
@@ -73,4 +79,4 @@ public:
 	void setWaitingFileNames(std::vector<std::string> waitingFileNames);
 };
 
-#endif /* PRIMARYRADAR_H_ */
+#endif /* PRIMARY_RADAR_H */

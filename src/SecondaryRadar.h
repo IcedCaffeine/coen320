@@ -1,17 +1,22 @@
-#ifndef SECONDARYRADAR_H_
-#define SECONDARYRADAR_H_
+#ifndef SECONDARYRADAR_H
+#define SECONDARYRADAR_H
 
-#include <fcntl.h>
+// C++ Libraries
 #include <fstream>
 #include <iostream>
+#include <vector>
+
+// C++ Headers
+#include <fcntl.h>
+#include <sys/resource.h>
+#include <sys/types.h>
+#include <sys/mman.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/mman.h>
-#include <sys/types.h>
 #include <unistd.h>
-#include <vector>
-#include "Aircraft.h"
 
+// Object Headers
+#include "Aircraft.h"
 #include "Limits.h"
 #include "Timer.h"
 
@@ -39,8 +44,8 @@ private:
 
 	// Data
 	int initialize(int numberOfPlanes);
-	void *operateSecondaryRadar(void);
-	void updatePeriod();
+	void *setupSecondaryRadar(void);
+	void updateTimer();
 	bool getPlaneData();
 	bool readFlyingPlanes();
 	void writeFlyingPlanes();
@@ -73,4 +78,4 @@ public:
 
 };
 
-#endif /* SECONDARYRADAR_H_ */
+#endif /* SECONDARYRADAR_H */

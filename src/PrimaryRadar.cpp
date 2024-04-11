@@ -20,7 +20,7 @@ PrimaryRadar::~PrimaryRadar() {
 void PrimaryRadar::start() {
 	time(&at);
 	time(&startTime);
-	if (pthread_create(&primaryRadarThread, &attr, &PrimaryRadar::startPrimaryRadar, (void *)this) != EOK) {
+	if (pthread_create(&primaryRadarThread, &attr, &PrimaryRadar::startThread, (void *)this) != EOK) {
 		primaryRadarThread = 0;
 	}
 }
@@ -79,30 +79,29 @@ void PrimaryRadar::setWaitingFileNames(std::vector<std::string> waitingFileNames
 	this->waitingFileNames = waitingFileNames;
 }
 
-void *PrimaryRadar::startPrimaryRadar(void *context) {
-	((PrimaryRadar *)context)->OperatePrimaryRadar();
+void *PrimaryRadar::startThread(void *context) {
+	((PrimaryRadar *)context)->setupPrimaryRadar();
 	return NULL;
 }
 
 int PrimaryRadar::initialize(int numberOfPlanes) {
-	int rc = pthread_attr_init(&attr);
-	if (rc) {
-		printf("ERROR, RC from pthread_attr_init() is %d \n", rc);
+	int receive = pthread_attr_init(&attr);
+	if (receive) {
+		printf("ERROR, RC from pthread_attr_init() is %d \n", receive);
 	}
 
-	rc = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-	if (rc) {
-		printf("ERROR; RC from pthread_attr_setdetachstate() is %d \n", rc);
+	receive = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+	if (receive) {
+		printf("ERROR; RC from pthread_attr_setdetachstate() is %d \n", receive);
 	}
 
-	// open list of waiting planes shm
+	// Setup Waiting planes
 	shm_waitingPlanes = shm_open("waiting_planes", O_RDWR, 0666);
 	if (shm_waitingPlanes == -1) {
 		perror("in shm_open() PSR");
 		exit(1);
 	}
 
-	// map waiting planes shm
 	waitingPlanesPtr = mmap(0, SIZE_SHM_PSR, PROT_READ | PROT_WRITE, MAP_SHARED, shm_waitingPlanes, 0);
 	if (waitingPlanesPtr == MAP_FAILED) {
 		perror("in map() PSR");
@@ -111,10 +110,9 @@ int PrimaryRadar::initialize(int numberOfPlanes) {
 
 	std::string fileDataBuffer = "";
 	std::vector<std::string> waitFile = this->getWaitingFileNames();
-
 	for (int i = 0; i < SIZE_SHM_PSR; i++) {
-		char readChar = *((char *)waitingPlanesPtr + i);
-		if (readChar == ',') {
+		char readCharacter = *((char *)waitingPlanesPtr + i);
+		if (readCharacter == ',') {
 			waitFile.push_back(fileDataBuffer);
 			int shm_plane = shm_open(fileDataBuffer.c_str(), O_RDONLY, 0666);
 			if (shm_plane == -1) {
@@ -131,10 +129,8 @@ int PrimaryRadar::initialize(int numberOfPlanes) {
 			planePtrs.push_back(ptr);
 			fileDataBuffer = "";
 			continue;
-		} else if (readChar == ';') {
+		} else if (readCharacter == ';') {
 			waitFile.push_back(fileDataBuffer);
-
-			// open shm for current plane
 			int shm_plane = shm_open(fileDataBuffer.c_str(), O_RDONLY, 0666);
 			if (shm_plane == -1) {
 				perror("in shm_open() PSR plane");
@@ -142,7 +138,6 @@ int PrimaryRadar::initialize(int numberOfPlanes) {
 				exit(1);
 			}
 
-			// map memory for current plane
 			void *ptr = mmap(0, SIZE_SHM_PLANES, PROT_READ, MAP_SHARED, shm_plane, 0);
 			if (ptr == MAP_FAILED) {
 				perror("in map() PSR");
@@ -153,30 +148,28 @@ int PrimaryRadar::initialize(int numberOfPlanes) {
 			break;
 		}
 
-		fileDataBuffer += readChar;
+		fileDataBuffer += readCharacter;
 	}
 	this->setWaitingFileNames(waitFile);
 
-	std::cout << "Waiting File Name Count" << this->getWaitingFileNames().size() << "\n";
-
+	// Setup Flying Planes
 	shm_flyingPlanes = shm_open("flying_planes", O_RDWR, 0666);
 	if (shm_flyingPlanes == -1) {
 		perror("in shm_open() PSR: airspace");
 		exit(1);
 	}
-
 	flyingPlanesPtr = mmap(0, SIZE_SHM_SSR, PROT_READ | PROT_WRITE, MAP_SHARED, shm_flyingPlanes, 0);
 	if (flyingPlanesPtr == MAP_FAILED) {
 		printf("map failed airspace\n");
 		return -1;
 	}
 
+	// Setup Periods
 	shm_period = shm_open("period", O_RDONLY, 0666);
 	if (shm_period == -1) {
 		perror("in shm_open() PSR: period");
 		exit(1);
 	}
-
 	periodPtr = mmap(0, SIZE_SHM_PERIOD, PROT_READ, MAP_SHARED, shm_period, 0);
 	if (periodPtr == MAP_FAILED) {
 		perror("in map() PSR: period");
@@ -186,7 +179,7 @@ int PrimaryRadar::initialize(int numberOfPlanes) {
 	return 0;
 }
 
-void *PrimaryRadar::OperatePrimaryRadar(void) {
+void *PrimaryRadar::setupPrimaryRadar(void) {
 	time(&at);
 	// create channel to communicate with timer
 	int chid = ChannelCreate(0);
@@ -195,8 +188,8 @@ void *PrimaryRadar::OperatePrimaryRadar(void) {
 	}
 
 	Timer *newTimer = new Timer(chid);
+	newTimer->setTimer(PRIMARY_SOURCE_RADAR_PERIOD, PRIMARY_SOURCE_RADAR_PERIOD);
 	this->setTimer(newTimer) ;
-	this->getTimer()->setTimer(PRIMARY_SOURCE_RADAR_PERIOD, PRIMARY_SOURCE_RADAR_PERIOD);
 
 	int receiveId;
 	Message message;
@@ -206,9 +199,8 @@ void *PrimaryRadar::OperatePrimaryRadar(void) {
 			// lock mutex
 			pthread_mutex_lock(&mutex);
 
-			this->updatePeriod();
-			bool move = this->readWaitingPlanes();
-			if (move) {
+			this->updateTimer();
+			if (this->readWaitingPlanes()) {
 				this->writeFlyingPlanes();
 			}
 
@@ -221,8 +213,7 @@ void *PrimaryRadar::OperatePrimaryRadar(void) {
 			if (this->getNumWaitingPlanes() <= 0) {
 				std::cout << "Primary radar is done\n";
 				time(&finishTime);
-				double execTime = difftime(finishTime, startTime);
-				std::cout << "PSR execution time: " << execTime << " seconds\n";
+				std::cout << "PSR execution time: " << difftime(finishTime, startTime) << " seconds\n";
 				ChannelDestroy(chid);
 				return 0;
 			}
@@ -236,7 +227,7 @@ void *PrimaryRadar::OperatePrimaryRadar(void) {
 }
 
 
-void PrimaryRadar::updatePeriod() {
+void PrimaryRadar::updateTimer() {
 	int newPeriod = atoi((char *)periodPtr);
 	if (newPeriod != this->getCurrPeriod()) {
 		this->setCurrPeriod(newPeriod);
@@ -255,16 +246,15 @@ bool PrimaryRadar::readWaitingPlanes() {
 	while (it != planePtrs.end()) {
 		int j = 0;
 		for (; j < 4; j++) {
-			if (*((char *)*it + j) != ',') {
+			if (*((char *)*it + j) == ',') {
 				break;
 			}
 		}
 
 		// extract arrival time
-		int curr_arrival_time = atoi((char *)(*it) + j + 1);
+		int currentArrivalTime = atoi((char *)(*it) + j + 1);
 		time(&et);
-		double t_current = difftime(et, at);
-		if (curr_arrival_time <= t_current) {
+		if (currentArrivalTime <= difftime(et, at)) {
 			if(!this->getWaitingFileNames().empty()){
 				move = true;
 				flyingPlanes.push_back(waitPlanes.at(i));

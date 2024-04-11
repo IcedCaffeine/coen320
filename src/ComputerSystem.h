@@ -1,55 +1,51 @@
-#ifndef COMPUTERSYSTEM_H_
-#define COMPUTERSYSTEM_H_
+#ifndef COMPUTER_SYSTEM_H
+#define COMPUTER_SYSTEM_H
 
-#include <cstdlib>
-#include <errno.h>
+// C++ Library
 #include <fstream>
 #include <list>
-#include <pthread.h>
+#include <cstdlib>
+#include <vector>
+
+// C++ Header
 #include <stdio.h>
+#include <errno.h>
+#include <pthread.h>
+#include <time.h>
 #include <sys/neutrino.h>
 #include <sys/siginfo.h>
-#include <time.h>
-#include <vector>
-#include "Aircraft.h"
+
+// Object
 #include "DataDisplay.h"
 #include "Limits.h"
+#include "Aircraft.h"
 #include "SecondaryRadar.h"
 #include "Timer.h"
 
-class Aircraft; // forward declaration
+class Aircraft; // Call Aircraft class
 
 // prediction container
 struct trajectoryPrediction {
-	int id;
-	int time;
-
-	std::vector<int> posX;
-	std::vector<int> posY;
-	std::vector<int> posZ;
-
-	bool keep; // keep for next iteration
+	int id,time;
+	bool keep;
+	std::vector<int> posX,posY,posZ;
 };
 
 struct plane {
-	int id;
-	int arrivalTime;
-	int posX,posY,posZ;
-	int velX,velY,velZ;
-	bool keep; // keep for next iteration
-	bool moreInfo;
+	int id,arrivalTime;
+	int posX,posY,posZ,velX,velY,velZ;
+	bool keep,moreInfo;
 	int commandCounter;
 };
 
 class ComputerSystem {
 private:
 	/* Data */
-	int planeCount;
-	int currentPeriod;
+	int planeCount,currentPeriod;
 	std::vector<plane *> flyingPlanesInfo;
 	std::vector<trajectoryPrediction *> trajectoryPredictions;
-	std::vector<void *> communicationPtr;
 	std::vector<std::string> communicationNames;
+	std::vector<void *> communicationPtr;
 
 	// Timer
 	Timer *timer;
@@ -60,25 +56,20 @@ private:
 	pthread_mutex_t mutex;
 
 	// execution time members
-	time_t startTime;
-	time_t finishTime;
+	time_t startTime,finishTime;
 
 	// shm members
-	int shm_airspace;
-	void *flyingPlanesPtr;
-	int shm_period;
-	void *periodPtr;
-	int shm_display;
-	void *displayPtr;
+	int shm_airspace,shm_period,shm_display;
+	void *airspacePtr,*periodPtr,*displayPtr;
 
 	// Roles
 	int initialize();
-	void *calculateTrajectories();
+	void *computePath();
 	bool readAirspace();
-	void cleanPredictions();
-	void computeViolations(std::ofstream *out);
-	void writeAndDisplay();
 	void updatePeriod(int chid);
+	void clearPredictions();
+	void findViolations(std::ofstream *out);
+	void writeAndDisplay();
 
 public:
 	// Constructor & Destructor

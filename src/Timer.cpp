@@ -9,7 +9,7 @@ Timer::Timer(int channelId) {
 	}
 
 	// set up the kind of event that we want to deliver -- a pulse
-	SIGEV_PULSE_INIT(&event, connectionId, SIGEV_PULSE_PRIO_INHERIT, CODE_TIMER, 0);
+	SIGEV_PULSE_INIT(&event, this->getConnectionId(), SIGEV_PULSE_PRIO_INHERIT, CODE_TIMER, 0);
 
 	// create the timer, binding it to the event
 	if (timer_create(CLOCK_REALTIME, &event, &timerId) == -1) {
@@ -25,7 +25,6 @@ int Timer::setTimer(int offset, int period) {
   timer.it_value.tv_nsec = (offset % ONE_MILLION) * ONE_THOUSAND;
   timer.it_interval.tv_sec = period / ONE_MILLION;
   timer.it_interval.tv_nsec = (period % ONE_MILLION) * ONE_THOUSAND;
-
   return timer_settime(timerId, 0, &timer, NULL);
 }
 

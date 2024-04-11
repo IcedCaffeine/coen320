@@ -1,29 +1,33 @@
-#ifndef AIRCRAFT_H_
-#define AIRCRAFT_H_
+#ifndef AIRCRAFT_H
+#define AIRCRAFT_H
 
-#include <errno.h>
-#include <fcntl.h>
+// C++ Includes
 #include <fstream>
 #include <iostream>
-#include <pthread.h>
 #include <sstream>
-#include <stdio.h>
-#include <stdlib.h>
+
+// C++ Headers
 #include <sys/mman.h>
 #include <sys/neutrino.h>
 #include <sys/siginfo.h>
 #include <sys/types.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <pthread.h>
+#include <time.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
 
+// Class Objects
 #include "Limits.h"
 #include "Timer.h"
 
 class Aircraft {
 private:
 	// Data
-	int arrivalTime;
-	int ID;
+	int ID, arrivalTime;
 	int x,y,z;
 	int speedX,speedY,speedZ;
 
@@ -35,24 +39,22 @@ private:
 	pthread_attr_t attr;
 	pthread_mutex_t mutex;
 
-	// Time members
-	time_t startTime;
-	time_t finishTime;
+	// Time
+	time_t startTime, finishTime;
 
 	// shm
 	int shm_fd;
 	void *ptr;
-	std::string planeMessage;
-	std::string fileName;
+	std::string planeMessage,fileName;
 
 	// Roles
 	int initialize(); // initialize thread and shm
-	void *flyPlane(void); // Update Plane Position & Speed
-	void answerComm(); // Check Comms for Commands
-	void updatePosition(); // Update position
-	void toString();
+	void *navigatePlane(void); // Update Plane Position & Speed
 	int checkLimits(); // check airspace limits for operation termination
 	void print(); // print plane info
+	void answerCommunications(); // Check Comms for Commands
+	void updatePosition(); // Update position
+	void toString();
 
 public:
 	// Constructor & Destructor
@@ -89,8 +91,8 @@ public:
 	int start();  // start thread
 	bool stop(); // join execution thread
 	static void *startThread(void *context); // start Execution of Thread
-	const char *getFD();
+	const char *getFileData();
 
 
 };
-#endif /* AIRCRAFT_H_ */
+#endif /* AIRCRAFT_H */

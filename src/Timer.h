@@ -1,24 +1,28 @@
-#ifndef TIMER_H_
-#define TIMER_H_
+#ifndef TIMER_H
+#define TIMER_H
 
-#include <errno.h>
-#include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
+// C++ Header
 #include <sys/neutrino.h>
 #include <sys/siginfo.h>
+#include <stdio.h>
+#include <errno.h>
+#include <signal.h>
+#include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
 
+// Object Header
 #include "Limits.h"
-// message structure
+
+
+// Structures
 typedef struct {
   int messageType; // contains both message to and from client
   int messageData; // optional data, depending upon message
 } ClientMessage;
 
 typedef union {
-  ClientMessage msg;   // a message can be either from a client
+  ClientMessage clientMessage;   // a message can be either from a client
   struct _pulse pulse; // a pulse
 } Message;
 
@@ -40,4 +44,4 @@ public:
 	void setConnectionId(int connectionId);
 };
 
-#endif /* TIMER_H_ */
+#endif /* TIMER_H */

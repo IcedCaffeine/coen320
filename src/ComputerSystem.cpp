@@ -83,22 +83,20 @@ void ComputerSystem::setTrajectoryPredictions(std::vector<trajectoryPrediction*>
 
 // entry point for execution function
 void *ComputerSystem::startThread(void *context) {
-	((ComputerSystem *)context)->calculateTrajectories();
+	((ComputerSystem *)context)->computePath();
 	return NULL;
 }
 
 int ComputerSystem::initialize() {
-	// initialize thread members
-
-	// set threads in detached state
-	int rc = pthread_attr_init(&attr);
-	if (rc) {
-		printf("ERROR, RC from pthread_attr_init() is %d \n", rc);
+	// Setup Threads
+	int receive = pthread_attr_init(&attr);
+	if (receive) {
+		printf("ERROR, RC from pthread_attr_init() is %d \n", receive);
 	}
 
-	rc = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-	if (rc) {
-		printf("ERROR; RC from pthread_attr_setdetachstate() is %d \n", rc);
+	receive = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+	if (receive) {
+		printf("ERROR; RC from pthread_attr_setdetachstate() is %d \n", receive);
 	}
 
 	// shared memory members
@@ -108,8 +106,8 @@ int ComputerSystem::initialize() {
 		exit(1);
 	}
 
-	flyingPlanesPtr = mmap(0, SIZE_SHM_AIRSPACE, PROT_READ, MAP_SHARED, shm_airspace, 0);
-	if (flyingPlanesPtr == MAP_FAILED) {
+	airspacePtr = mmap(0, SIZE_SHM_AIRSPACE, PROT_READ, MAP_SHARED, shm_airspace, 0);
+	if (airspacePtr == MAP_FAILED) {
 		perror("in Computer System map() airspace");
 		exit(1);
 	}
@@ -128,27 +126,27 @@ int ComputerSystem::initialize() {
 
 	shm_display = shm_open("display", O_RDWR, 0666);
 	if (shm_display == -1) {
-		perror("in compsys shm_open() display");
+		perror("in Computer System shm_open() display");
 		exit(1);
 	}
 
 
 	displayPtr = mmap(0, SIZE_SHM_DISPLAY, PROT_READ | PROT_WRITE, MAP_SHARED,shm_display, 0);
 	if (displayPtr == MAP_FAILED) {
-		perror("in copmsys map() display");
+		perror("in Computer System map() display");
 		exit(1);
 	}
 
 
 	int shm_comm = shm_open("waiting_planes", O_RDONLY, 0666);
 	if (shm_comm == -1) {
-		perror("in compsys shm_open() comm");
+		perror("in Computer System shm_open()");
 		exit(1);
 	}
 
 	void *communicationPtr = mmap(0, SIZE_SHM_PSR, PROT_READ, MAP_SHARED, shm_comm, 0);
 	if (communicationPtr == MAP_FAILED) {
-		perror("in compsys map() comm");
+		perror("in Computer System map()");
 		exit(1);
 	}
 
@@ -156,20 +154,36 @@ int ComputerSystem::initialize() {
 	std::string buffer = "";
 
 	for (int i = 0; i < SIZE_SHM_PSR; i++) {
-		char readChar = *((char *)communicationPtr + i);
+		char readCharacter = *((char *)communicationPtr + i);
 
-		// Open shm ifor current Plane
-		if(readChar == ','){
+		if(readCharacter == ';'){
 			int shm_plane = shm_open(buffer.c_str(), O_RDWR, 0666);
 			if (shm_plane == -1) {
-				perror("in compsys shm_open() plane");
+				perror("in Computer System shm_open() plane");
 				exit(1);
 			}
 
 			// Map Plane Current Memory
 			void *ptr = mmap(0, SIZE_SHM_PLANES, PROT_READ | PROT_WRITE, MAP_SHARED,shm_plane, 0);
 			if (ptr == MAP_FAILED) {
-				perror("in compsys map() plane");
+				perror("in Computer System map() plane");
+				exit(1);
+			}
+			this->getCommunicationPtrs().push_back(ptr);
+			this->getCommunicationNames().push_back(buffer);
+			break;
+		}
+		else if(readCharacter == ','){
+			int shm_plane = shm_open(buffer.c_str(), O_RDWR, 0666);
+			if (shm_plane == -1) {
+				perror("in Computer System shm_open() plane");
+				exit(1);
+			}
+
+			// Map Plane Current Memory
+			void *ptr = mmap(0, SIZE_SHM_PLANES, PROT_READ | PROT_WRITE, MAP_SHARED,shm_plane, 0);
+			if (ptr == MAP_FAILED) {
+				perror("in Computer System map() plane");
 				exit(1);
 			}
 			this->getCommunicationPtrs().push_back(ptr);
@@ -179,41 +193,26 @@ int ComputerSystem::initialize() {
 			buffer = "";
 			continue;
 		}
-		else if(readChar == ';'){
-			int shm_plane = shm_open(buffer.c_str(), O_RDWR, 0666);
-			if (shm_plane == -1) {
-				perror("in compsys shm_open() plane");
-				exit(1);
-			}
-
-			// Map Plane Current Memory
-			void *ptr = mmap(0, SIZE_SHM_PLANES, PROT_READ | PROT_WRITE, MAP_SHARED,shm_plane, 0);
-			if (ptr == MAP_FAILED) {
-				perror("in compsys map() plane");
-				exit(1);
-			}
-			this->getCommunicationPtrs().push_back(ptr);
-			this->getCommunicationNames().push_back(buffer);
-			break;
-		}
-		buffer += readChar;
+		buffer += readCharacter;
 	}
 	return 0;
 }
 
-void *ComputerSystem::calculateTrajectories() {
+void *ComputerSystem::computePath() {
 	// create channel to communicate with timer
 	int channelId = ChannelCreate(0);
 	if (channelId == -1) {
 		std::cout << "couldn't create channel\n";
 	}
 
-	Timer *newTimer = new Timer(channelId);
-	this->timer = newTimer;
-	this->timer->setTimer(CS_PERIOD, CS_PERIOD);
-
+	// Setup Timer & Message
 	int receiveId;
 	Message msg;
+	Timer *newTimer = new Timer(channelId);
+	newTimer->setTimer(CS_PERIOD, CS_PERIOD);
+	this->timer = newTimer;
+
+
 	// Logging commands
 	std::ofstream outputStream("command");
 
@@ -223,8 +222,8 @@ void *ComputerSystem::calculateTrajectories() {
 			pthread_mutex_lock(&mutex);
 
 			done = this->readAirspace(); // read airspace shm
-			this->cleanPredictions();// prune predictions
-			this->computeViolations(&outputStream); // compute airspace violations for all planes in the airspace
+			this->clearPredictions();// prune predictions
+			this->findViolations(&outputStream); // compute airspace violations for all planes in the airspace
 			this->writeAndDisplay(); // send airspace info to display / prune airspace info
 			this->updatePeriod(channelId); // update the period based on the traffic
 
@@ -235,8 +234,7 @@ void *ComputerSystem::calculateTrajectories() {
 		if (this->getPlaneCount() <= 0 || done) {
 			std::cout << "computer system done\n";
 			time(&finishTime);
-			double execTime = difftime(finishTime, startTime);
-			std::cout << "computer system execution time: " << execTime << " seconds\n";
+			std::cout << "computer system execution time: " << difftime(finishTime, startTime) << " s\n";
 			sprintf((char *)displayPtr, "terminated");
 			ChannelDestroy(channelId);
 			return 0;
@@ -246,22 +244,19 @@ void *ComputerSystem::calculateTrajectories() {
 	}
 
 	outputStream.close();
-
 	ChannelDestroy(channelId);
-
 	return 0;
 }
 
 bool ComputerSystem::readAirspace() {
+	// Initialize Variables
+	int id, arrTime, pos[3], vel[3];
 	std::string readBuffer = "";
 	int j = 0;
 
-	// variable buffer, these get overwritten as needed
-	int id, arrTime, pos[3], vel[3];
-
-	// find planes in airspace
+	// Get Plane Locations
 	for (int i = 0; i < SIZE_SHM_AIRSPACE; i++) {
-		char readCharacter = *((char *)flyingPlanesPtr + i);
+		char readCharacter = *((char *)airspacePtr + i);
 		if (readCharacter == 't') {
 			return true;
 		}
@@ -277,107 +272,96 @@ bool ComputerSystem::readAirspace() {
 
 			// check if already in airspace, if yes update with current data
 			bool inList = false;
-			for (plane *craft : this->getFlyingPlanesInfo()) {
-				if (craft->id == id) {
-					// if found, update with current info
-					craft->posX = pos[0];
-					craft->posX = pos[1];
-					craft->posX = pos[2];
-					craft->velX = vel[0];
-					craft->velY = vel[1];
-					craft->velZ= vel[2];
-					// if found, keep, if not will be removed
-					craft->keep = true;
-					// it is already in the list, do not add new
+			for (plane *plane : this->getFlyingPlanesInfo()) {
+				if (plane->id == id) {
+					plane->posX = pos[0];plane->posY = pos[1];plane->posZ = pos[2];
+					plane->velX = vel[0];plane->velY = vel[1];plane->velZ= vel[2];
+					plane->keep = true;
 					inList = true;
 
 					for (trajectoryPrediction *prediction : this->getTrajectoryPredictions()) {
-						if (prediction->id == craft->id) {
+						if (prediction->id == plane->id) {
 
-							// if end of prediction reached, break
-							if (prediction->time >= (int)prediction->posX.size() ||
-									prediction->time >= (int)prediction->posY.size() ||
-									prediction->time >= (int)prediction->posZ.size()) {
+							// Check Time
+							bool predictionX = prediction->time >= (int)prediction->posX.size();
+							bool predictionY = prediction->time >= (int)prediction->posX.size();
+							bool predictionZ = prediction->time >= (int)prediction->posX.size();
+							if (predictionX || predictionY || predictionZ) {
 								break;
 							}
 
-							// check posx, posy and poz if same
-							if (prediction->posX.at(prediction->time) == craft->posX &&
-									prediction->posY.at(prediction->time) == craft->posY &&
-									prediction->posZ.at(prediction->time) == craft->posZ) {
-								// set prediction index to next
-								// update last entry in predictions
+							// Check Position
+							predictionX = prediction->posX.at(prediction->time) == plane->posX;
+							predictionY = prediction->posY.at(prediction->time) == plane->posY;
+							predictionZ = prediction->posZ.at(prediction->time) == plane->posZ;
+
+
+							if (predictionX && predictionY && predictionZ) {
+								// Get Last X Position
 								auto it = prediction->posX.end();
 								it -= 2;
-								int lastX = *it + (this->getCurrentPeriod() / 1000000) * craft->velX;
+								int lastX = *it + (this->getCurrentPeriod() / 1000000) * plane->velX;
+
+								// Get Last Y Position
 								it = prediction->posY.end();
 								it -= 2;
-								int lastY = *it + (this->getCurrentPeriod() / 1000000) * craft->velY;
+								int lastY = *it + (this->getCurrentPeriod() / 1000000) * plane->velY;
+
+								// Get Last Z Position
 								it = prediction->posZ.end();
 								it -= 2;
-								int lastZ = *it + (this->getCurrentPeriod() / 1000000) * craft->velZ;
+								int lastZ = *it + (this->getCurrentPeriod() / 1000000) * plane->velZ;
 
 								// check if still within limits
-								bool outOfBounds = false;
-								if (lastX > MAX_X_AIRSPACE || lastX < MIN_X_AIRSPACE) {
-									outOfBounds = true;
-								}
-								if (lastY > MAX_Y_AIRSPACE || lastY < MIN_Y_AIRSPACE) {
-									outOfBounds = true;
-								}
-								if (lastZ > MAX_Z_AIRSPACE || lastZ < MIN_Z_AIRSPACE) {
-									outOfBounds = true;
-								}
-								// if not, just increment
-								if (outOfBounds) {
+								bool outOfBoundsX = lastX > MAX_X_AIRSPACE || lastX < MIN_X_AIRSPACE;
+								bool outOfBoundsY = lastY > MAX_Y_AIRSPACE || lastY < MIN_Y_AIRSPACE;
+								bool outOfBoundsZ = lastZ > MAX_Z_AIRSPACE || lastZ < MIN_Z_AIRSPACE;
+
+								if(outOfBoundsX || outOfBoundsY || outOfBoundsZ){
 									prediction->keep = true;
 									prediction->time++;
 									break;
 								}
 
-								// add new last prediction
+
+								// Add New Predictions
 								prediction->posX.pop_back();
 								prediction->posX.push_back(lastX);
 								prediction->posX.push_back(-1);
+
 								prediction->posY.pop_back();
 								prediction->posY.push_back(lastY);
 								prediction->posY.push_back(-1);
+
 								prediction->posZ.pop_back();
 								prediction->posZ.push_back(lastZ);
 								prediction->posZ.push_back(-1);
 
-								// keep for computation and increment index
 								prediction->keep = true;
 								prediction->time++;
 							}
-							// update the prediction
 							else {
 								prediction->posX.clear();
 								prediction->posY.clear();
 								prediction->posZ.clear();
 
 								for (int i = 0; i < (180 / (this->getCurrentPeriod() / 1000000)); i++) {
-									int currX = craft->posX + i * (this->getCurrentPeriod() / 1000000) * craft->velX;
-									int currY = craft->posY + i * (this->getCurrentPeriod() / 1000000) * craft->velY;
-									int currZ = craft->posZ + i * (this->getCurrentPeriod() / 1000000) * craft->velZ;
+									int currX = plane->posX + i * (this->getCurrentPeriod() / 1000000) * plane->velX;
+									int currY = plane->posY + i * (this->getCurrentPeriod() / 1000000) * plane->velY;
+									int currZ = plane->posZ + i * (this->getCurrentPeriod() / 1000000) * plane->velZ;
 
 									prediction->posX.push_back(currX);
 									prediction->posY.push_back(currY);
 									prediction->posZ.push_back(currZ);
 
-									bool outOfBounds = false;
-									if (currX > MAX_X_AIRSPACE || currX < MIN_X_AIRSPACE) {
-										outOfBounds = true;
-									}
-									if (currY > MAX_Y_AIRSPACE || currY < MIN_Y_AIRSPACE) {
-										outOfBounds = true;
-									}
-									if (currZ > MAX_Z_AIRSPACE || currZ < MIN_Z_AIRSPACE) {
-										outOfBounds = true;
-									}
-									if (outOfBounds) {
+									bool outOfBoundsX = currX > MAX_X_AIRSPACE || currX < MIN_X_AIRSPACE;
+									bool outOfBoundsY = currY > MAX_Y_AIRSPACE || currY < MIN_Y_AIRSPACE;
+									bool outOfBoundsZ = currZ > MAX_Z_AIRSPACE || currZ < MIN_Z_AIRSPACE;
+
+									if(outOfBoundsX || outOfBoundsY || outOfBoundsZ){
 										break;
 									}
+
 								}
 								// set termination character
 								prediction->posX.push_back(-1);
@@ -395,21 +379,17 @@ bool ComputerSystem::readAirspace() {
 
 			// if plane was not already in the list, add it
 			if (!inList) {
-				// new pointer to struct, set members from read
+				// Add Flying Plane
 				plane *currentAircraft = new plane();
 				currentAircraft->id = id;
 				currentAircraft->arrivalTime = arrTime;
-				currentAircraft->posX = pos[0];
-				currentAircraft->posY = pos[1];
-				currentAircraft->posZ = pos[2];
-				currentAircraft->velX = vel[0];
-				currentAircraft->velY = vel[1];
-				currentAircraft->velZ = vel[2];
-				currentAircraft->keep = true; // keep for first computation
+				currentAircraft->posX = pos[0];currentAircraft->posY = pos[1];currentAircraft->posZ = pos[2];
+				currentAircraft->velX = vel[0];currentAircraft->velY = vel[1];currentAircraft->velZ = vel[2];
+				currentAircraft->keep = true;
 				this->getFlyingPlanesInfo().push_back(currentAircraft);
 
+				// Setup trajectory Prediction
 				trajectoryPrediction *currentPrediction = new trajectoryPrediction();
-
 				currentPrediction->id = currentAircraft->id;
 
 				for (int i = 0; i < 180 / (this->getCurrentPeriod() / 1000000); i++) {
@@ -421,28 +401,21 @@ bool ComputerSystem::readAirspace() {
 					currentPrediction->posY.push_back(currY);
 					currentPrediction->posZ.push_back(currZ);
 
-					bool outOfBounds = false;
-					if (currX > MAX_X_AIRSPACE || currX < MIN_X_AIRSPACE) {
-						outOfBounds = true;
-					}
-					if (currY > MAX_Y_AIRSPACE || currY < MIN_Y_AIRSPACE) {
-						outOfBounds = true;
-					}
-					if (currZ > MAX_Z_AIRSPACE || currZ < MIN_Z_AIRSPACE) {
-						outOfBounds = true;
-					}
-					if (outOfBounds) {
+					bool outOfBoundsX = currX > MAX_X_AIRSPACE || currX < MIN_X_AIRSPACE;
+					bool outOfBoundsY = currY > MAX_Y_AIRSPACE || currY < MIN_Y_AIRSPACE;
+					bool outOfBoundsZ = currZ > MAX_Z_AIRSPACE || currZ < MIN_Z_AIRSPACE;
+
+					if(outOfBoundsX || outOfBoundsY || outOfBoundsZ){
 						break;
 					}
+
 				}
 				// set termination character
 				currentPrediction->posX.push_back(-1);
 				currentPrediction->posY.push_back(-1);
 				currentPrediction->posZ.push_back(-1);
-				// set prediction index to next, keep for first computation
 				currentPrediction->time = 1;
 				currentPrediction->keep = true;
-				// add to list
 				this->getTrajectoryPredictions().push_back(currentPrediction);
 				break;
 			}
@@ -455,24 +428,18 @@ bool ComputerSystem::readAirspace() {
 
 			// check if already in airspace, if yes update with current data
 			bool inList = false;
-			for (plane *craft : this->getFlyingPlanesInfo()) {
+			for (plane *plane : this->getFlyingPlanesInfo()) {
 
-				if (craft->id == id) {
+				if (plane->id == id) {
 
 					// if found, update with current info
-					craft->posX = pos[0];
-					craft->posY = pos[1];
-					craft->posZ = pos[2];
-					craft->velX = vel[0];
-					craft->velY = vel[1];
-					craft->velZ = vel[2];
-					// if found, keep, if not will be removed
-					craft->keep = true;
-					// if already in list, do not add new
+					plane->posX = pos[0];plane->posY = pos[1];plane->posZ = pos[2];
+					plane->velX = vel[0];plane->velY = vel[1];plane->velZ = vel[2];
+					plane->keep = true;
 					inList = true;
 
 					for (trajectoryPrediction *prediction : this->getTrajectoryPredictions()) {
-						if (prediction->id == craft->id) {
+						if (prediction->id == plane->id) {
 
 							// if end of prediction reached, break
 							bool predictionX = prediction->time >= (int)prediction->posX.size();
@@ -483,20 +450,26 @@ bool ComputerSystem::readAirspace() {
 								break;
 							}
 
-							// check posx, posy and poz if same
-							if (prediction->posX.at(prediction->time) == craft->posX && prediction->posY.at(prediction->time) == craft->posY && prediction->posZ.at(prediction->time) == craft->posZ) {
+							// check positions are the same
+							predictionX = prediction->posX.at(prediction->time) == plane->posX;
+							predictionY = prediction->posY.at(prediction->time) == plane->posY;
+							predictionZ = prediction->posZ.at(prediction->time) == plane->posZ;
+
+							if (predictionX && predictionY && predictionZ) {
+								// Setup Last X values
 								auto it = prediction->posX.end();
 								it -= 2;
-								int lastX = *it + (this->getCurrentPeriod() / 1000000) * craft->velX;
+								int lastX = *it + (this->getCurrentPeriod() / 1000000) * plane->velX;
+
 								it = prediction->posY.end();
 								it -= 2;
-								int lastY = *it + (this->getCurrentPeriod() / 1000000) * craft->velY;
+								int lastY = *it + (this->getCurrentPeriod() / 1000000) * plane->velY;
+
 								it = prediction->posZ.end();
 								it -= 2;
-								int lastZ = *it + (this->getCurrentPeriod() / 1000000) * craft->velZ;
+								int lastZ = *it + (this->getCurrentPeriod() / 1000000) * plane->velZ;
 
 								// check if still within limits
-								bool outOfBounds = false;
 								bool outOfXBound = lastX > MAX_X_AIRSPACE || lastX < MIN_X_AIRSPACE;
 								bool outOfYBound = lastY > MAX_Y_AIRSPACE || lastY < MIN_Y_AIRSPACE;
 								bool outOfZBound = lastZ > MAX_Z_AIRSPACE || lastZ < MIN_Z_AIRSPACE;
@@ -511,9 +484,11 @@ bool ComputerSystem::readAirspace() {
 								prediction->posX.pop_back();
 								prediction->posX.push_back(lastX);
 								prediction->posX.push_back(-1);
+
 								prediction->posY.pop_back();
 								prediction->posY.push_back(lastY);
 								prediction->posY.push_back(-1);
+
 								prediction->posZ.pop_back();
 								prediction->posZ.push_back(lastZ);
 								prediction->posZ.push_back(-1);
@@ -529,21 +504,19 @@ bool ComputerSystem::readAirspace() {
 								prediction->posZ.clear();
 
 								for (int i = 0; i < 180 / (currentPeriod / 1000000); i++) {
-									int currX = craft->posX + i * (currentPeriod / 1000000) * craft->velX;
-									int currY = craft->posY + i * (currentPeriod / 1000000) * craft->velY;
-									int currZ = craft->posZ + i * (currentPeriod / 1000000) * craft->velZ;
+									int currX = plane->posX + i * (currentPeriod / 1000000) * plane->velX;
+									int currY = plane->posY + i * (currentPeriod / 1000000) * plane->velY;
+									int currZ = plane->posZ + i * (currentPeriod / 1000000) * plane->velZ;
 
 									prediction->posX.push_back(currX);
 									prediction->posY.push_back(currY);
 									prediction->posZ.push_back(currZ);
 
-									bool outOfBounds = false;
 									bool outOfXBound = currX > MAX_X_AIRSPACE || currX < MIN_X_AIRSPACE;
 									bool outOfYBound = currY > MAX_Y_AIRSPACE || currY < MIN_Y_AIRSPACE;
 									bool outOfZBound = currZ > MAX_Z_AIRSPACE || currZ < MIN_Z_AIRSPACE;
 
 									if (outOfXBound || outOfYBound || outOfZBound) {
-										outOfBounds = true;
 										break;
 									}
 								}
@@ -551,7 +524,6 @@ bool ComputerSystem::readAirspace() {
 								prediction->posX.push_back(-1);
 								prediction->posY.push_back(-1);
 								prediction->posZ.push_back(-1);
-								// set prediction index to next, keep for computation
 								prediction->time = 1;
 								prediction->keep = true;
 							}
@@ -562,22 +534,17 @@ bool ComputerSystem::readAirspace() {
 				}
 			}
 
-			// if plane was not already in the list, add it
+			// Adds new List if it's not already in
 			if (!inList) {
 				plane *currentAircraft = new plane();
 				currentAircraft->id = id;
 				currentAircraft->arrivalTime = arrTime;
-				currentAircraft->posX = pos[0];
-				currentAircraft->posY = pos[1];
-				currentAircraft->posZ = pos[2];
-				currentAircraft->velX = vel[0];
-				currentAircraft->velY = vel[1];
-				currentAircraft->velZ = vel[2];
-				currentAircraft->keep = true; // keep for first computation
+				currentAircraft->posX = pos[0];currentAircraft->posY = pos[1];currentAircraft->posZ = pos[2];
+				currentAircraft->velX = vel[0];currentAircraft->velY = vel[1];currentAircraft->velZ = vel[2];
+				currentAircraft->keep = true;
 				this->getFlyingPlanesInfo().push_back(currentAircraft);
 
 				trajectoryPrediction *currentPrediction = new trajectoryPrediction();
-
 				currentPrediction->id = currentAircraft->id;
 
 				for (int i = 0; i < 180 / (currentPeriod / 1000000); i++) {
@@ -589,34 +556,30 @@ bool ComputerSystem::readAirspace() {
 					currentPrediction->posY.push_back(currY);
 					currentPrediction->posZ.push_back(currZ);
 
-					bool outOfBounds = false;
 					bool outOfXBound = currX > MAX_X_AIRSPACE || currX < MIN_X_AIRSPACE;
 					bool outOfYBound = currY > MAX_Y_AIRSPACE || currY < MIN_Y_AIRSPACE;
 					bool outOfZBound = currZ > MAX_Z_AIRSPACE || currZ < MIN_Z_AIRSPACE;
-
 					if (outOfXBound || outOfYBound || outOfZBound) {
-						outOfBounds = true;
 						break;
 					}
 				}
-				// set termination character
+
+				// Set terminal Character
 				currentPrediction->posX.push_back(-1);
 				currentPrediction->posY.push_back(-1);
 				currentPrediction->posZ.push_back(-1);
-				// set prediction index to next, keep for first computation
 				currentPrediction->time = 1;
 				currentPrediction->keep = true;
-				// add to list
 				this->getTrajectoryPredictions().push_back(currentPrediction);
 			}
 
-			// reset buffer and index for next plane
 			readBuffer = "";
 			j = 0;
 			continue;
 		}
 		// found next data field in current plane
 		else if (readCharacter == ',') {
+
 			switch (j) {
 			// add whichever character the index j has arrived to
 			case 0:
@@ -665,45 +628,39 @@ bool ComputerSystem::readAirspace() {
 	return false;
 }
 
-void ComputerSystem::cleanPredictions() {
+void ComputerSystem::clearPredictions() {
 	int j = 0;
-	auto itpred = this->getTrajectoryPredictions().begin();
-	while (itpred != this->getTrajectoryPredictions().end()) {
-		bool temp = (*itpred)->keep;
+	auto predictionPtr = this->getTrajectoryPredictions().begin();
+	while (predictionPtr != this->getTrajectoryPredictions().end()) {
+		bool temp = (*predictionPtr)->keep;
 
 		// check if plane was terminated
 		if (!temp) {
 			delete this->getTrajectoryPredictions().at(j);
-			itpred = this->getTrajectoryPredictions().erase(itpred);
+			predictionPtr = this->getTrajectoryPredictions().erase(predictionPtr);
 		}
 		else {
-			for (int i = (*itpred)->time - 1; i < (*itpred)->time + (180 / (this->getCurrentPeriod() / 1000000)); i++) {
-				int currX = (*itpred)->posX.at(i);
-				int currY = (*itpred)->posY.at(i);
-				int currZ = (*itpred)->posZ.at(i);
-
-				if (currX == -1 || currY == -1 || currZ == -1) {
+			for (int i = (*predictionPtr)->time - 1; i < (*predictionPtr)->time + (180 / (this->getCurrentPeriod() / 1000000)); i++) {
+				if ((*predictionPtr)->posX.at(i) == -1 || (*predictionPtr)->posY.at(i) == -1 || (*predictionPtr)->posZ.at(i) == -1) {
 					break;
 				}
 			}
 
-			(*itpred)->keep = false; // if found next time, this will become true again
+			(*predictionPtr)->keep = false; // if found next time, this will become true again
 			j++;
-			++itpred;
+			++predictionPtr;
 		}
 	}
 }
 
-void ComputerSystem::computeViolations(std::ofstream *out) {
+void ComputerSystem::findViolations(std::ofstream *out) {
 	auto itIndex = this->getTrajectoryPredictions().begin();
 	while (itIndex != this->getTrajectoryPredictions().end()) {
 		auto itNext = itIndex;
 		++itNext;
 		while (itNext != this->getTrajectoryPredictions().end()) {
-			// compare predictions, starting at current
 			int j = (*itNext)->time - 1;
-			for (int i = (*itIndex)->time - 1;
-					i < (*itIndex)->time - 1 + (180 / (this->getCurrentPeriod() / 1000000)); i++) {
+			for (int i = (*itIndex)->time - 1;i < (*itIndex)->time - 1 + (180 / (this->getCurrentPeriod() / 1000000)); i++) {
 				int currX = (*itIndex)->posX.at(i);
 				int currY = (*itIndex)->posY.at(i);
 				int currZ = (*itIndex)->posZ.at(i);
@@ -711,28 +668,27 @@ void ComputerSystem::computeViolations(std::ofstream *out) {
 				int compY = (*itNext)->posY.at(j);
 				int compZ = (*itNext)->posZ.at(j);
 
-				if (currX == -1 || currY == -1 || currZ == -1) {
-					break;
-				}
-				if (compX == -1 || compY == -1 || compZ == -1) {
+				if (currX == -1 || currY == -1 || currZ == -1 || compX == -1 || compY == -1 || compZ == -1) {
 					break;
 				}
 
-				if ((abs(currX - compX) <= 3000 && abs(currY - compY) <= 3000) &&
-						abs(currZ - compZ) <= 1000) {
+				// Positions
+				bool currentX = abs(currX - compX) <= 3000;
+				bool currentY = abs(currY - compY) <= 3000;
+				bool currentZ = abs(currZ - compZ) <= 1000;
+
+				if (currentX && currentY && currentZ) {
 					std::cout << "airspace violation detected between planes "
 							<< (*itIndex)->id << " and " << (*itNext)->id
 							<< " at time current + " << i * (currentPeriod) / 1000000
 							<< "\n";
-					bool currComm = false;
-					bool compComm = false;
-					// find comm
-					for (void *comm : this->getCommunicationPtrs()) {
-						// comm shm id
-						int commId = atoi((char *)comm);
 
-						if (commId == (*itIndex)->id) {
-							// find command index in plane shm
+					// Setup Communication
+					bool currCommunications = false;
+					bool compCommunications = false;
+					for (void *comm : this->getCommunicationPtrs()) {
+						int communicationId = atoi((char *)comm);
+						if (communicationId == (*itIndex)->id) {
 							int k = 0;
 							char readChar;
 							for (; k < SIZE_SHM_PLANES; k++) {
@@ -749,9 +705,9 @@ void ComputerSystem::computeViolations(std::ofstream *out) {
 							std::cout.rdbuf(out->rdbuf()); // redirect std::cout to command
 							std::cout << "Command: Plane " << (*itIndex)->id << " increases altitude by 200 feet" << std::endl;
 							std::cout.rdbuf(coutbuf); // reset to standard output again
-							currComm = true;
+							currCommunications = true;
 						}
-						if (commId == (*itNext)->id) {
+						if (communicationId == (*itNext)->id) {
 							// find command index in plane shm
 							int k = 0;
 							char readChar;
@@ -769,27 +725,27 @@ void ComputerSystem::computeViolations(std::ofstream *out) {
 							std::cout.rdbuf(out->rdbuf()); // redirect std::cout to command
 							std::cout << "Command: Plane " << (*itNext)->id << " decreases altitude by 200 feet" << std::endl;
 							std::cout.rdbuf(coutbuf); // reset to standard output again
-							compComm = true;
+							compCommunications = true;
 						}
-						if (currComm && compComm) {
+						if (currCommunications && compCommunications) {
 							break;
 						}
 					}
 					// set associate craft info request to true, display height
-					currComm = false;
-					compComm = false;
+					currCommunications = false;
+					compCommunications = false;
 					for (plane *craft : this->getFlyingPlanesInfo()) {
 						if (craft->id == (*itIndex)->id) {
 							craft->moreInfo = true;
 							craft->commandCounter = NUM_PRINT;
-							currComm = true;
+							currCommunications = true;
 						}
 						if (craft->id == (*itNext)->id) {
 							craft->moreInfo = true;
 							craft->commandCounter = NUM_PRINT;
-							compComm = true;
+							compCommunications = true;
 						}
-						if (currComm && compComm) {
+						if (currCommunications && compCommunications) {
 							break;
 						}
 					}
@@ -805,9 +761,9 @@ void ComputerSystem::computeViolations(std::ofstream *out) {
 
 void ComputerSystem::writeAndDisplay() {
 
-	std::string displayBuffer = "";
-	std::string currentPlaneBuffer = "";
-	// print what was found, remove what is no longer in the airspace
+	std::string displayBuffer = "", currentPlaneBuffer = "";
+
+
 	int i = 0;
 	auto it = this->getFlyingPlanesInfo().begin();
 	while (it != this->getFlyingPlanesInfo().end()) {
@@ -818,10 +774,7 @@ void ComputerSystem::writeAndDisplay() {
 			it = this->getFlyingPlanesInfo().erase(it);
 			this->setPlaneCount(this->getPlaneCount()-1);
 		} else {
-			// add plane to buffer for display
 
-			// id,posx,posy,posz,info
-			// ex: 1,15000,20000,5000,0
 			displayBuffer = displayBuffer +
 					std::to_string((*it)->id) + "," +
 					std::to_string((*it)->posX) + "," +
@@ -854,25 +807,27 @@ void ComputerSystem::writeAndDisplay() {
 
 void ComputerSystem::updatePeriod(int chid) {
 	int newPeriod = 0;
-	if (this->getTrajectoryPredictions().size() <= 5) {
-		// set period low
-		newPeriod = 5000000;
-	}
-	if (this->getTrajectoryPredictions().size() > 5 && this->getTrajectoryPredictions().size() <= 20) {
-		// set period medium
-		newPeriod = 3000000;
-	}
-	if (this->getTrajectoryPredictions().size() > 20 && this->getTrajectoryPredictions().size() <= 50) {
-		// set period high
-		newPeriod = 2000000;
-	}
-	if (this->getTrajectoryPredictions().size() > 50 && this->getTrajectoryPredictions().size() <= 200) {
+	int size = this->getTrajectoryPredictions().size();
+
+	// Setup Trajectory Size
+	if (size > 50 && size <= 200) {
 		// set period overdrive
 		newPeriod = 1000000;
 	}
+	else if (size > 20 && size <= 50) {
+		// set period high
+		newPeriod = 2000000;
+	}
+	else if (size > 5 && size <= 20) {
+		// set period medium
+		newPeriod = 3000000;
+	}
+	else if (size <= 5) {
+		// set period low
+		newPeriod = 5000000;
+	}
 
-
-
+	// Update period
 	if (this->getCurrentPeriod() != newPeriod) {
 		this->setCurrentPeriod(newPeriod);
 		std::string CSPeriod = std::to_string(this->getCurrentPeriod());
